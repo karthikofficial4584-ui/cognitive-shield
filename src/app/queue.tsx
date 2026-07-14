@@ -108,110 +108,26 @@ interface QueuedItem {
   status: 'Queued' | 'Releasing' | 'Released';
 }
 
-function QueueManagerScreen() {
-  // Config query
-  const { data: config } = useQuery({
-    queryKey: ['queueConfig'],
-    queryFn: fetchQueueConfig,
-  });
+import { useShield } from '@/context/ShieldContext';
 
-  const releaseThreshold = config?.releaseThreshold ?? 75;
+function QueueManagerScreen() {
+  const {
+    focusScore,
+    queue,
+    analytics,
+    demoModeActive: isSimulating,
+    startDemoSimulation,
+    stopDemoSimulation,
+    releaseTop,
+    releaseAll,
+    clearQueue,
+    deleteQueueItem,
+  } = useShield();
+
+  const releaseThreshold = 75;
 
   // 1. Core States
-  const [focusScore, setFocusScore] = useState(88);
-  const [queueStatus, setQueueStatus] = useState<'Locked' | 'Releasing' | 'Empty'>('Locked');
-  const [isSimulating, setIsSimulating] = useState(false);
   const [isQueuePaused, setIsQueuePaused] = useState(false);
-  
-  // Active queue list
-  const [queue, setQueue] = useState<QueuedItem[]>([
-    {
-      id: '1',
-      sender: 'Slack',
-      app: 'Slack',
-      title: 'Dave: taco lunch?',
-      message: 'Dave: Hey Commander! Grab lunch at 12:15? Tacos down the street are really good.',
-      timeReceived: '22:30',
-      focusScore: 85,
-      urgencyScore: 0.12,
-      estReleaseTime: '6 mins',
-      queuePosition: 1,
-      reason: 'Blocked because Focus Score was 85 and urgency was 0.12.',
-      status: 'Queued',
-    },
-    {
-      id: '2',
-      sender: 'Microsoft Teams',
-      app: 'Teams',
-      title: 'Product Sync Update',
-      message: 'Sarah: Please post your progress updates in channel before the sync meeting.',
-      timeReceived: '22:15',
-      focusScore: 90,
-      urgencyScore: 0.25,
-      estReleaseTime: '12 mins',
-      queuePosition: 2,
-      reason: 'Blocked because Focus Score was 90 and urgency was 0.25.',
-      status: 'Queued',
-    },
-    {
-      id: '3',
-      sender: 'GitHub',
-      app: 'GitHub',
-      title: 'PR #42 Approved',
-      message: 'Reviewer: Approved changes in features/auth. Ready for QA staging merge.',
-      timeReceived: '21:55',
-      focusScore: 78,
-      urgencyScore: 0.45,
-      estReleaseTime: '3 mins',
-      queuePosition: 3,
-      reason: 'Blocked because Focus Score was 78 and urgency was 0.45.',
-      status: 'Queued',
-    },
-    {
-      id: '4',
-      sender: 'Slack',
-      app: 'Slack',
-      title: 'Weekly Standup Reminder',
-      message: 'StandupBot: Please post your yesterday accomplishments and goals for today.',
-      timeReceived: '21:30',
-      focusScore: 80,
-      urgencyScore: 0.15,
-      estReleaseTime: '15 mins',
-      queuePosition: 4,
-      reason: 'Blocked because Focus Score was 80 and urgency was 0.15.',
-      status: 'Queued',
-    },
-    {
-      id: '5',
-      sender: 'Email',
-      app: 'Email',
-      title: 'Digest: Dev Trends',
-      message: 'newsletter@dev: React 19 compiler optimization and server action sequences.',
-      timeReceived: '21:10',
-      focusScore: 82,
-      urgencyScore: 0.05,
-      estReleaseTime: '20 mins',
-      queuePosition: 5,
-      reason: 'Blocked because Focus Score was 82 and urgency was 0.05.',
-      status: 'Queued',
-    },
-    {
-      id: '6',
-      sender: 'Jira',
-      app: 'Jira',
-      title: 'Ticket Assigned: SEC-904',
-      message: 'Jirabot: SEC-904 CSS styling bug was assigned to you with high priority.',
-      timeReceived: '21:00',
-      focusScore: 88,
-      urgencyScore: 0.35,
-      estReleaseTime: '8 mins',
-      queuePosition: 6,
-      reason: 'Blocked because Focus Score was 88 and urgency was 0.35.',
-      status: 'Queued',
-    },
-  ]);
-
-  // Selected item for detailed timeline preview (defaults to first item)
   const [selectedItemId, setSelectedItemId] = useState<string>('1');
 
   // Stats derived state
@@ -220,10 +136,10 @@ function QueueManagerScreen() {
       avgWaitTime: queue.length > 0 ? `${queue.length * 3 + 2} mins` : '0 mins',
       longestWait: queue.length > 0 ? `${queue.length * 5} mins` : '0 mins',
       currentQueue: queue.length,
-      releasedToday: 24,
-      savedInterruptions: 112,
+      releasedToday: analytics.releasedNotif,
+      savedInterruptions: analytics.switchesPrevented,
     };
-  }, [queue]);
+  }, [queue, analytics]);
 
   const selectedItem = useMemo(() => {
     return queue.find(item => item.id === selectedItemId) || queue[0];
@@ -237,6 +153,9 @@ function QueueManagerScreen() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
   };
+
+  // Derive status
+  const queueStatus = queue.length === 0 ? 'Empty' : (focusScore < 75 ? 'Releasing' : 'Locked');
 
   // 2. Shared animation loops
   const pulseOpacity = useSharedValue(0.6);
@@ -253,8 +172,6 @@ function QueueManagerScreen() {
   }));
 
   // 3. Queue Release Logic & Simulation
-  const simTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const handleReleaseOne = () => {
     if (queue.length === 0) {
       showToast('Queue is empty');
@@ -262,24 +179,7 @@ function QueueManagerScreen() {
     }
     const targetItem = queue[0];
     showToast(`Released: ${targetItem.sender}`);
-    
-    // Animate target item state change
-    setQueue(prev => prev.map((item, idx) => {
-      if (idx === 0) return { ...item, status: 'Released' as const };
-      return item;
-    }));
-
-    // Remove from queue after delay
-    setTimeout(() => {
-      setQueue(prev => {
-        const nextQueue = prev.filter(item => item.id !== targetItem.id);
-        // Recalculate queue positions
-        return nextQueue.map((item, index) => ({
-          ...item,
-          queuePosition: index + 1,
-        }));
-      });
-    }, 400);
+    releaseTop();
   };
 
   const handleReleaseAll = () => {
@@ -288,25 +188,9 @@ function QueueManagerScreen() {
       return;
     }
     showToast(`Releasing all ${queue.length} notifications...`);
-    setQueueStatus('Releasing');
-
-    // Pop cards one-by-one
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < queue.length) {
-        const targetId = queue[index].id;
-        setQueue(prev =>
-          prev.map(item => (item.id === targetId ? { ...item, status: 'Released' } : item))
-        );
-        index++;
-      } else {
-        clearInterval(interval);
-        setTimeout(() => {
-          setQueue([]);
-          setQueueStatus('Empty');
-          setShowSuccessAnim(true);
-        }, 500);
-      }
+    releaseAll();
+    setTimeout(() => {
+      setShowSuccessAnim(true);
     }, 600);
   };
 
@@ -315,20 +199,12 @@ function QueueManagerScreen() {
       showToast('Queue is empty');
       return;
     }
-    setQueue([]);
-    setQueueStatus('Empty');
+    clearQueue();
     showToast('Queue cleared successfully');
   };
 
   const handleDeleteItem = (id: string) => {
-    setQueue(prev =>
-      prev
-        .filter(item => item.id !== id)
-        .map((item, index) => ({
-          ...item,
-          queuePosition: index + 1,
-        }))
-    );
+    deleteQueueItem(id);
     showToast('Notification deleted from queue');
   };
 
@@ -341,160 +217,21 @@ function QueueManagerScreen() {
     }
   };
 
-  // 4. Demo Simulation mode (Rises -> blocks -> drops -> releases)
   const startSimulationSequence = () => {
     if (isSimulating) {
-      if (simTimerRef.current) clearInterval(simTimerRef.current);
-      setIsSimulating(false);
+      stopDemoSimulation();
       showToast('Simulation stopped');
-      return;
+    } else {
+      setShowSuccessAnim(false);
+      startDemoSimulation();
+      showToast('Simulation started - Focus level dropping');
     }
-
-    setIsSimulating(true);
-    setShowSuccessAnim(false);
-    showToast('Simulation started - Focus level dropping');
-
-    let currentScore = 88;
-    setFocusScore(currentScore);
-    setQueueStatus('Locked');
-    setIsQueuePaused(false);
-
-    // Pre-populate queue if empty
-    if (queue.length === 0) {
-      handleResetQueue();
-    }
-
-    let step = 0;
-
-    simTimerRef.current = setInterval(() => {
-      step++;
-      if (step === 1) {
-        // Drop 1
-        currentScore = 82;
-        setFocusScore(currentScore);
-      } else if (step === 2) {
-        // Drop 2
-        currentScore = 74;
-        setFocusScore(currentScore);
-        setQueueStatus('Releasing');
-        showToast('Focus dropped below 75 - Queue unlocked!');
-      } else if (step >= 3) {
-        // Pop items one-by-one
-        setQueue(prev => {
-          if (prev.length === 0) {
-            clearInterval(simTimerRef.current!);
-            setIsSimulating(false);
-            setQueueStatus('Empty');
-            setShowSuccessAnim(true);
-            return [];
-          }
-          const target = prev[0];
-          // Release first
-          setTimeout(() => {
-            setQueue(inner => inner.filter(item => item.id !== target.id).map((item, idx) => ({ ...item, queuePosition: idx + 1 })));
-          }, 300);
-
-          return prev.map(item => item.id === target.id ? { ...item, status: 'Released' as const } : item);
-        });
-      }
-    }, 2000);
   };
 
   const handleResetQueue = () => {
-    if (simTimerRef.current) clearInterval(simTimerRef.current);
-    setIsSimulating(false);
+    stopDemoSimulation();
     setShowSuccessAnim(false);
-    setFocusScore(88);
-    setQueueStatus('Locked');
-    setIsQueuePaused(false);
-    setQueue([
-      {
-        id: '1',
-        sender: 'Slack',
-        app: 'Slack',
-        title: 'Dave: taco lunch?',
-        message: 'Dave: Hey Commander! Grab lunch at 12:15? Tacos down the street are really good.',
-        timeReceived: '22:30',
-        focusScore: 85,
-        urgencyScore: 0.12,
-        estReleaseTime: '6 mins',
-        queuePosition: 1,
-        reason: 'Blocked because Focus Score was 85 and urgency was 0.12.',
-        status: 'Queued',
-      },
-      {
-        id: '2',
-        sender: 'Microsoft Teams',
-        app: 'Teams',
-        title: 'Product Sync Update',
-        message: 'Sarah: Please post your progress updates in channel before the sync meeting.',
-        timeReceived: '22:15',
-        focusScore: 90,
-        urgencyScore: 0.25,
-        estReleaseTime: '12 mins',
-        queuePosition: 2,
-        reason: 'Blocked because Focus Score was 90 and urgency was 0.25.',
-        status: 'Queued',
-      },
-      {
-        id: '3',
-        sender: 'GitHub',
-        app: 'GitHub',
-        title: 'PR #42 Approved',
-        message: 'Reviewer: Approved changes in features/auth. Ready for QA staging merge.',
-        timeReceived: '21:55',
-        focusScore: 78,
-        urgencyScore: 0.45,
-        estReleaseTime: '3 mins',
-        queuePosition: 3,
-        reason: 'Blocked because Focus Score was 78 and urgency was 0.45.',
-        status: 'Queued',
-      },
-      {
-        id: '4',
-        sender: 'Slack',
-        app: 'Slack',
-        title: 'Weekly Standup Reminder',
-        message: 'StandupBot: Please post your yesterday accomplishments and goals for today.',
-        timeReceived: '21:30',
-        focusScore: 80,
-        urgencyScore: 0.15,
-        estReleaseTime: '15 mins',
-        queuePosition: 4,
-        reason: 'Blocked because Focus Score was 80 and urgency was 0.15.',
-        status: 'Queued',
-      },
-      {
-        id: '5',
-        sender: 'Email',
-        app: 'Email',
-        title: 'Digest: Dev Trends',
-        message: 'newsletter@dev: React 19 compiler optimization and server action sequences.',
-        timeReceived: '21:10',
-        focusScore: 82,
-        urgencyScore: 0.05,
-        estReleaseTime: '20 mins',
-        queuePosition: 5,
-        reason: 'Blocked because Focus Score was 82 and urgency was 0.05.',
-        status: 'Queued',
-      },
-      {
-        id: '6',
-        sender: 'Jira',
-        app: 'Jira',
-        title: 'Ticket Assigned: SEC-904',
-        message: 'Jirabot: SEC-904 CSS styling bug was assigned to you with high priority.',
-        timeReceived: '21:00',
-        focusScore: 88,
-        urgencyScore: 0.35,
-        estReleaseTime: '8 mins',
-        queuePosition: 6,
-        reason: 'Blocked because Focus Score was 88 and urgency was 0.35.',
-        status: 'Queued',
-      },
-    ]);
-    setSelectedItemId('1');
-    showToast('Queue data reset successfully');
+    showToast('Queue reset complete');
   };
 
   // Reusable badge color picker

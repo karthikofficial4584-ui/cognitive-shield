@@ -189,38 +189,61 @@ function CountUpText({ value, suffix = '', prefix = '', duration = 800, style }:
   return <Text style={style}>{prefix}{current}{suffix}</Text>;
 }
 
+import { useShield } from '@/context/ShieldContext';
+
 function AnalyticsDashboard() {
   const [dateRange, setDateRange] = useState<'Today' | 'This Week' | 'This Month'>('Today');
-
-  // React Query Fetch based on range
-  const { data: analyticsData, refetch, isFetching } = useQuery({
-    queryKey: ['analyticsReport', dateRange],
-    queryFn: () => fetchAnalyticsReport(dateRange),
-  });
+  const { analytics: liveAnalytics, isLoading: isFetching } = useShield();
 
   const report = useMemo(() => {
-    return analyticsData ?? {
-      productivityScore: 92,
-      focusTrend: '+8% vs yesterday',
-      deepFocusMinutes: 252,
-      preventedInteractions: 42,
-      savedMinutes: 180,
-      focusEfficiency: 94,
-      allowedNotif: 8,
-      blockedNotif: 34,
-      criticalAlerts: 2,
-      queuedNotif: 12,
-      releasedNotif: 10,
-      avgQueueTime: 14,
-      avgVelocity: 84,
-      typingTrend: '+12% WPM',
-      codeChangesTrend: '+142 lines',
-      consistencyIndex: 91,
-      attentionStability: 96,
-      switchesPrevented: 42,
-      weeklyImprovement: 8.5,
+    if (dateRange === 'Today') {
+      return liveAnalytics;
+    }
+    if (dateRange === 'This Week') {
+      return {
+        productivityScore: 88,
+        focusTrend: '+12% vs last week',
+        deepFocusMinutes: 1320,
+        preventedInteractions: 245,
+        savedMinutes: 980,
+        focusEfficiency: 89,
+        allowedNotif: 58,
+        blockedNotif: 187,
+        criticalAlerts: 14,
+        queuedNotif: 62,
+        releasedNotif: 48,
+        avgQueueTime: 18,
+        avgVelocity: 79,
+        typingTrend: '+6% WPM',
+        codeChangesTrend: '+1,240 lines',
+        consistencyIndex: 87,
+        attentionStability: 92,
+        switchesPrevented: 245,
+        weeklyImprovement: 12.0,
+      };
+    }
+    return {
+      productivityScore: 84,
+      focusTrend: '+4% vs last month',
+      deepFocusMinutes: 5240,
+      preventedInteractions: 984,
+      savedMinutes: 3936,
+      focusEfficiency: 86,
+      allowedNotif: 210,
+      blockedNotif: 720,
+      criticalAlerts: 48,
+      queuedNotif: 284,
+      releasedNotif: 215,
+      avgQueueTime: 22,
+      avgVelocity: 76,
+      typingTrend: '+4% WPM',
+      codeChangesTrend: '+4,890 lines',
+      consistencyIndex: 82,
+      attentionStability: 89,
+      switchesPrevented: 984,
+      weeklyImprovement: 4.8,
     };
-  }, [analyticsData]);
+  }, [dateRange, liveAnalytics]);
 
   // Shared values
   const refreshRotation = useSharedValue(0);
@@ -250,7 +273,6 @@ function AnalyticsDashboard() {
         refreshRotation.value = 0;
       }
     });
-    refetch();
   };
 
   const handleExport = (format: 'pdf' | 'csv' | 'share') => {

@@ -148,17 +148,15 @@ const switchStyles = StyleSheet.create({
   },
 });
 
-function ProfileSettingsScreen() {
-  // Config query
-  const { data: config } = useQuery({
-    queryKey: ['profileConfig'],
-    queryFn: fetchProfileConfig,
-  });
+import { useShield } from '@/context/ShieldContext';
 
-  const memberSince = config?.memberSince ?? 'Jul 2026';
-  const streakCount = config?.streak ?? 12;
-  const deepWorkHours = config?.todayDeepWork ?? '4h 12m';
-  const productivityScore = config?.todayProd ?? 92;
+function ProfileSettingsScreen() {
+  const { analytics, isOffline, toggleOfflineMode } = useShield();
+
+  const memberSince = 'Jul 2026';
+  const streakCount = 12;
+  const deepWorkHours = Math.floor(analytics.deepFocusMinutes / 60) + 'h ' + (analytics.deepFocusMinutes % 60) + 'm';
+  const productivityScore = analytics.productivityScore;
 
   // 1. Settings Local States
   const [focusThreshold, setFocusThreshold] = useState(75);
@@ -575,10 +573,10 @@ function ProfileSettingsScreen() {
 
             <View style={styles.settingToggleRow}>
               <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={styles.toggleLabel}>Anonymous analytics sharing</Text>
-                <Text style={styles.settingDesc}>Transmit baseline metric reports to development nodes.</Text>
+                <Text style={styles.toggleLabel}>Simulated Offline Mode</Text>
+                <Text style={styles.settingDesc}>Enforces local cached telemetry updates without backend endpoints sync.</Text>
               </View>
-              <GlassSwitch value={analyticsSharing} onValueChange={setAnalyticsSharing} activeColor={activeColor} />
+              <GlassSwitch value={isOffline} onValueChange={toggleOfflineMode} activeColor={activeColor} />
             </View>
 
             <TouchableOpacity onPress={handleDeleteData} style={[styles.btnDangerAction, { marginTop: 12 }]}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -95,40 +95,39 @@ export default function HomeScreen() {
   );
 }
 
-function DashboardScreen() {
-  // 1. React Query Setup
-  const { data: initialData, refetch, isFetching } = useQuery({
-    queryKey: ['dashboardData'],
-    queryFn: fetchDashboardData,
-  });
+import { useShield } from '@/context/ShieldContext';
 
-  // 2. Local State Management
-  const [focusScore, setFocusScore] = useState(85);
-  const [focusState, setFocusState] = useState<'Deep Focus' | 'Focused' | 'Normal' | 'Distracted' | 'Idle'>('Deep Focus');
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [isFocusMode, setIsFocusMode] = useState(false);
-  const [queueCount, setQueueCount] = useState(12);
-  const [notificationsBlocked, setNotificationsBlocked] = useState(42);
-  const [criticalAlerts, setCriticalAlerts] = useState(3);
-  const [deepFocusTime, setDeepFocusTime] = useState('4h 12m');
-  const [productivityScore, setProductivityScore] = useState(92);
-  
-  const [typingSpeed, setTypingSpeed] = useState(78);
-  const [codeChanges, setCodeChanges] = useState(142);
-  const [windowActivity, setWindowActivity] = useState(3);
-  const [velocityScore, setVelocityScore] = useState(84);
+function DashboardScreen() {
+  const {
+    focusScore,
+    velocity: velocityScore,
+    activeActivity,
+    typingSpeed,
+    codeChanges,
+    windowConsistency: windowActivity,
+    queue,
+    notifications,
+    analytics,
+    demoModeActive: isDemoMode,
+    startDemoSimulation,
+    stopDemoSimulation,
+    releaseAll,
+    criticalAlertActive,
+    isLoading,
+  } = useShield();
+
   const [currentTab, setCurrentTab] = useState<'home' | 'live' | 'notifications' | 'analytics' | 'profile'>('home');
+  const [isFocusMode, setIsFocusMode] = useState(false);
+
+  const focusState = focusScore >= 85 ? 'Deep Focus' : focusScore >= 75 ? 'Focused' : focusScore >= 50 ? 'Normal' : focusScore >= 30 ? 'Distracted' : 'Idle';
+  const queueCount = queue.length;
+  const notificationsBlocked = analytics.blockedNotif;
+  const criticalAlerts = analytics.criticalAlerts;
+  const deepFocusTime = Math.floor(analytics.deepFocusMinutes / 60) + 'h ' + (analytics.deepFocusMinutes % 60) + 'm';
+  const productivityScore = analytics.productivityScore;
 
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
-
-  // Timeline Activity Log State
-  const [timeline, setTimeline] = useState([
-    { id: '1', time: '22:10', title: 'Focus Increased', desc: 'Score spiked to 92. Entered Deep Focus', type: 'success' },
-    { id: '2', time: '22:12', title: 'Notification Blocked', desc: 'Distraction from Slack intercepted', type: 'block' },
-    { id: '3', time: '22:15', title: 'Critical Alert Allowed', desc: 'Production server latency warning', type: 'warning' },
-    { id: '4', time: '22:20', title: 'Queue Released', desc: 'Delivered 8 buffered non-urgent pings', type: 'release' },
-  ]);
 
   // Toast notification for user actions
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -145,126 +144,16 @@ function DashboardScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Sync with initial query data when loaded
-  useEffect(() => {
-    if (initialData) {
-      setFocusScore(initialData.focusScore);
-      setFocusState(initialData.focusState as any);
-      setTypingSpeed(initialData.typingSpeed);
-      setCodeChanges(initialData.codeChanges);
-      setWindowActivity(initialData.windowActivity);
-      setVelocityScore(initialData.velocityScore);
-      setDeepFocusTime(initialData.deepFocusTime);
-      setNotificationsBlocked(initialData.notificationsBlocked);
-      setCriticalAlerts(initialData.criticalAlerts);
-      setQueueCount(initialData.queuedNotifications);
-      setProductivityScore(initialData.productivityScore);
-    }
-  }, [initialData]);
-
-  // 3. Demo Mode Simulation Loop
-  const demoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const demoStepRef = useRef(0);
-
-  useEffect(() => {
-    if (isDemoMode) {
-      showToast('Demo Mode Activated - Simulating workflow lifecycle');
-      const steps = [
-        {
-          score: 96,
-          state: 'Deep Focus' as const,
-          typing: 88,
-          code: 245,
-          windows: 1,
-          velocity: 95,
-          prod: 98,
-          alert: 'Focus level optimum. Extraneous apps disabled.',
-          time: '22:23',
-        },
-        {
-          score: 76,
-          state: 'Focused' as const,
-          typing: 72,
-          code: 110,
-          windows: 2,
-          velocity: 78,
-          prod: 88,
-          alert: 'Slack ping queued silently. Focus maintained.',
-          time: '22:24',
-        },
-        {
-          score: 52,
-          state: 'Normal' as const,
-          typing: 45,
-          code: 40,
-          windows: 4,
-          velocity: 60,
-          prod: 72,
-          alert: 'Increased window changes detected.',
-          time: '22:25',
-        },
-        {
-          score: 28,
-          state: 'Distracted' as const,
-          typing: 15,
-          code: 5,
-          windows: 9,
-          velocity: 32,
-          prod: 45,
-          alert: 'High multitasking rate. Audio alert suggested.',
-          time: '22:26',
-        },
-        {
-          score: 12,
-          state: 'Idle' as const,
-          typing: 0,
-          code: 0,
-          windows: 0,
-          velocity: 10,
-          prod: 30,
-          alert: 'Telemetry inactive. User away from keyboard.',
-          time: '22:27',
-        },
-      ];
-
-      demoIntervalRef.current = setInterval(() => {
-        const step = steps[demoStepRef.current];
-        setFocusScore(step.score);
-        setFocusState(step.state);
-        setTypingSpeed(step.typing);
-        setCodeChanges(step.code);
-        setWindowActivity(step.windows);
-        setVelocityScore(step.velocity);
-        setProductivityScore(step.prod);
-
-        // Append to activity timeline
-        const newEvent = {
-          id: String(Date.now()),
-          time: step.time,
-          title: `State: ${step.state}`,
-          desc: step.alert,
-          type: step.score > 70 ? 'success' : step.score > 40 ? 'warning' : 'block',
-        };
-        setTimeline((prev) => [newEvent, ...prev.slice(0, 5)]);
-
-        if (step.score < 40) {
-          setNotificationsBlocked((prev) => prev + 1);
-          setQueueCount((prev) => prev + 1);
-        }
-
-        demoStepRef.current = (demoStepRef.current + 1) % steps.length;
-      }, 4000);
-    } else {
-      if (demoIntervalRef.current) {
-        clearInterval(demoIntervalRef.current);
-        showToast('Demo Mode Deactivated');
-      }
-    }
-
-    return () => {
-      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
-    };
-  }, [isDemoMode]);
+  // Sync timeline with notifications block events
+  const timeline = useMemo(() => {
+    return notifications.slice(0, 4).map((n) => ({
+      id: n.id,
+      time: n.time,
+      title: n.status === 'Critical' ? 'Critical Alert Allowed' : n.status === 'Blocked' ? 'Notification Intercepted' : 'Notification Allowed',
+      desc: n.message,
+      type: n.status === 'Critical' ? 'warning' : n.status === 'Blocked' ? 'block' : 'success',
+    }));
+  }, [notifications]);
 
   // Toast Helper
   const showToast = (msg: string) => {
@@ -276,26 +165,12 @@ function DashboardScreen() {
 
   // Quick Action Handlers
   const handleToggleFocusMode = () => {
-    setIsFocusMode(!isFocusMode);
-    if (!isFocusMode) {
-      setFocusScore(95);
-      setFocusState('Deep Focus');
-      showToast('Focus Mode Engaged: High-priority queue enabled');
-      // Log event
-      setTimeline((prev) => [
-        {
-          id: String(Date.now()),
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          title: 'Shield Engaged',
-          desc: 'High-priority focus guard active. Blocked all non-critical API requests.',
-          type: 'success',
-        },
-        ...prev.slice(0, 5),
-      ]);
+    if (isDemoMode) {
+      stopDemoSimulation();
+      showToast('Demo Simulation Stopped');
     } else {
-      setFocusScore(65);
-      setFocusState('Normal');
-      showToast('Focus Mode Disengaged');
+      startDemoSimulation();
+      showToast('Demo Simulation Started');
     }
   };
 
@@ -304,26 +179,12 @@ function DashboardScreen() {
       showToast('Queue is empty');
       return;
     }
-    const releasedCount = queueCount;
-    setQueueCount(0);
-    setNotificationsBlocked((prev) => prev + releasedCount);
-    showToast(`Released ${releasedCount} notifications successfully`);
-    setTimeline((prev) => [
-      {
-        id: String(Date.now()),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        title: 'Queue Released',
-        desc: `Batch delivered ${releasedCount} notifications to user inbox.`,
-        type: 'release',
-      },
-      ...prev.slice(0, 5),
-    ]);
+    releaseAll();
+    showToast('Attention queue flushed and notifications released');
   };
 
   const handleRefreshData = () => {
-    refetch().then(() => {
-      showToast('API Data Refetched via React Query');
-    });
+    showToast('Telemetry refreshed from local backend engine');
   };
 
   // 4. Shared Animation Values
@@ -449,7 +310,7 @@ function DashboardScreen() {
             <View style={[styles.indicatorLight, { backgroundColor: '#10B981' }]} />
             <Text style={styles.monitoringText}>Shield Monitoring Active</Text>
           </View>
-          {isFetching ? (
+          {isLoading ? (
             <ActivityIndicator size="small" color="#8B5CF6" />
           ) : (
             <TouchableOpacity onPress={handleRefreshData} style={styles.syncBtn}>
@@ -731,7 +592,7 @@ function DashboardScreen() {
           <View style={styles.actionsGrid}>
             
             <TouchableOpacity
-              onPress={() => setIsDemoMode(!isDemoMode)}
+              onPress={handleToggleFocusMode}
               style={[styles.actionButton, isDemoMode ? styles.actionActive : styles.actionInactive]}>
               {isDemoMode ? (
                 <Square size={16} color="#FFF" style={{ marginRight: 8 }} />

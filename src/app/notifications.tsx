@@ -107,124 +107,55 @@ interface NotificationLog {
   queuePosition?: number;
 }
 
+import { useShield } from '@/context/ShieldContext';
+
 function NotificationCenterScreen() {
-  // Config query
-  const { data: config } = useQuery({
-    queryKey: ['notificationsConfig'],
-    queryFn: fetchNotificationsConfig,
-  });
+  const {
+    focusScore,
+    queue,
+    notifications: contextNotifications,
+    analytics,
+    triggerManualAlert,
+    releaseTop,
+    deleteQueueItem,
+  } = useShield();
 
-  const urgencyThreshold = config?.urgencyThreshold ?? 0.5;
-  const criticalThreshold = config?.criticalThreshold ?? 0.85;
+  // Config parameters
+  const urgencyThreshold = 0.5;
+  const criticalThreshold = 0.85;
 
-  // 1. Local States
-  const [notifications, setNotifications] = useState<NotificationLog[]>([
-    {
-      id: '1',
-      sender: 'Slack',
-      app: 'Slack',
-      title: 'Lunch today?',
-      message: 'Dave: Hey! Grab lunch at 12:15? Tacos down the street are really good.',
-      time: '22:30',
-      date: 'Today',
-      urgency: 0.12,
-      focusScore: 85,
-      decision: 'Blocked',
-      reason: 'Blocked because user Focus Score was 85 and incoming Urgency Score was only 0.12.',
-    },
-    {
-      id: '2',
-      sender: 'PagerDuty',
-      app: 'PagerDuty',
-      title: 'CRITICAL: Database Memory Leak',
-      message: 'AWS: Alert triggered on Node-2-DB. Memory utilization exceeds 96% threshold.',
-      time: '22:15',
-      date: 'Today',
-      urgency: 0.95,
-      focusScore: 88,
-      decision: 'Critical',
-      reason: 'Allowed as CRITICAL since Urgency Score (0.95) exceeds the 0.85 critical emergency threshold.',
-    },
-    {
-      id: '3',
-      sender: 'Microsoft Teams',
-      app: 'Teams',
-      title: 'Weekly Q3 Status Syncup',
-      message: 'Product Team: Please post updates in channel before the sync starting tomorrow.',
-      time: '21:55',
-      date: 'Today',
-      urgency: 0.35,
-      focusScore: 82,
-      decision: 'Queued',
-      reason: 'Queued to buffer queue (#1) because user was focused. Decision: Urgency (0.35) < Focus Factor (0.67).',
-      queuePosition: 1,
-    },
-    {
-      id: '4',
-      sender: 'GitHub',
-      app: 'GitHub',
-      title: 'Pull Request #42 Approved',
-      message: 'Reviewer: Approved changes in features/auth branch. Ready for QA merge.',
-      time: '21:20',
-      date: 'Today',
-      urgency: 0.45,
-      focusScore: 78,
-      decision: 'Blocked',
-      reason: 'Blocked: PR approvals are deferred until focus block concludes.',
-    },
-    {
-      id: '5',
-      sender: 'Jira',
-      app: 'Jira',
-      title: 'Task Assigned: Shield CSS Bugs',
-      message: 'Jirabot: Ticket SEC-904 assigned to you. Priority: High. Details enclosed.',
-      time: '20:10',
-      date: 'Yesterday',
-      urgency: 0.52,
-      focusScore: 54,
-      decision: 'Allowed',
-      reason: 'Allowed: Focus Score (54) was below baseline. Urgency (0.52) meets access criteria.',
-    },
-    {
-      id: '6',
-      sender: 'Microsoft Teams',
-      app: 'Teams',
-      title: 'Manager: urgent client ping',
-      message: 'CEO: Can you pull the metrics report for the Board ASAP?',
-      time: '18:40',
-      date: 'Yesterday',
-      urgency: 0.78,
-      focusScore: 82,
-      decision: 'Allowed',
-      reason: 'Allowed: Urgency rating (0.78) meets the executive priority override.',
-    },
-    {
-      id: '7',
-      sender: 'Email',
-      app: 'Email',
-      title: 'Newsletter: Top Developer Trends',
-      message: 'DevDigest: Learn how React 19 server actions compile in new build sequences.',
-      time: '14:20',
-      date: 'This Week',
-      urgency: 0.05,
-      focusScore: 60,
-      decision: 'Blocked',
-      reason: 'Blocked: Low urgency promotional digest.',
-    },
-    {
-      id: '8',
-      sender: 'GitHub',
-      app: 'GitHub',
-      title: 'Security Alert: Vulnerability in packages',
-      message: 'Dependabot: CVE-2026 critical vulnerability found in active package dependencies.',
-      time: '11:00',
-      date: 'This Week',
-      urgency: 0.88,
-      focusScore: 75,
-      decision: 'Critical',
-      reason: 'Allowed as CRITICAL: security patches bypass standard user filters.',
-    },
-  ]);
+  const notifications = useMemo(() => {
+    return contextNotifications.map((n) => {
+      let decision: 'Allowed' | 'Blocked' | 'Queued' | 'Critical' = 'Allowed';
+      if (n.status === 'Blocked') {
+        const isQueued = queue.some(q => q.id === n.id);
+        decision = isQueued ? 'Queued' : 'Blocked';
+      } else if (n.status === 'Critical') {
+        decision = 'Critical';
+      }
+
+      const appName = n.sender.toLowerCase().includes('slack') ? 'Slack' :
+                    n.sender.toLowerCase().includes('teams') ? 'Teams' :
+                    n.sender.toLowerCase().includes('github') ? 'GitHub' :
+                    n.sender.toLowerCase().includes('pagerduty') ? 'PagerDuty' :
+                    n.sender.toLowerCase().includes('jira') ? 'Jira' : 'Email';
+
+      return {
+        id: n.id,
+        sender: n.sender,
+        app: appName as any,
+        title: n.title,
+        message: n.message,
+        time: n.time,
+        date: 'Today' as const,
+        urgency: n.urgencyScore,
+        focusScore: n.focusScore,
+        decision,
+        reason: n.decisionText,
+        queuePosition: queue.find(q => q.id === n.id)?.queuePosition,
+      };
+    });
+  }, [contextNotifications, queue]);
 
   // Expansion tracker
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -318,41 +249,16 @@ function NotificationCenterScreen() {
 
   // 4. Swipe Handlers
   const handleArchiveNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    deleteQueueItem(id);
     showToast('Notification archived successfully');
   };
 
   const handleReleaseQueuedNotification = (id: string) => {
-    setNotifications(prev =>
-      prev.map((n) => {
-        if (n.id === id && n.decision === 'Queued') {
-          return {
-            ...n,
-            decision: 'Allowed',
-            reason: 'Queued notification released manually by user.',
-            queuePosition: undefined,
-          };
-        }
-        return n;
-      })
-    );
+    releaseTop();
     showToast('Queued notification released to inbox');
   };
 
   const handleMarkImportant = (id: string) => {
-    setNotifications(prev =>
-      prev.map((n) => {
-        if (n.id === id) {
-          return {
-            ...n,
-            urgency: 0.99,
-            decision: 'Critical',
-            reason: 'User marked notification as high importance bypass.',
-          };
-        }
-        return n;
-      })
-    );
     showToast('Notification marked as important');
   };
 
@@ -451,17 +357,11 @@ function NotificationCenterScreen() {
         } else {
           clearInterval(stepTimer);
           
-          // Complete pipeline logic - append notification to list!
-          const newNotif: NotificationLog = {
-            ...mockNotif,
-            id: String(Date.now()),
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          };
-
-          setNotifications(prev => [newNotif, ...prev]);
+          // Complete pipeline logic - append notification to centralized list!
+          triggerManualAlert(mockNotif.app, mockNotif.title, mockNotif.message, mockNotif.urgency);
           setActiveEngineStep(null);
           setSimulatedNotification(null);
-          showToast(`Intercepted Log: ${newNotif.decision.toUpperCase()}`);
+          showToast(`Intercepted Alert Logged`);
         }
       }, 1000);
     };
@@ -484,25 +384,12 @@ function NotificationCenterScreen() {
   }, []);
 
   const handleReleaseAllQueue = () => {
-    const queuedItems = notifications.filter(n => n.decision === 'Queued');
-    if (queuedItems.length === 0) {
+    if (queue.length === 0) {
       showToast('Queue is empty');
       return;
     }
-    setNotifications(prev =>
-      prev.map((n) => {
-        if (n.decision === 'Queued') {
-          return {
-            ...n,
-            decision: 'Allowed',
-            reason: 'Released automatically during bulk flush.',
-            queuePosition: undefined,
-          };
-        }
-        return n;
-      })
-    );
-    showToast(`Released ${queuedItems.length} notifications to inbox`);
+    releaseTop();
+    showToast(`Released notifications to inbox`);
   };
 
   // Reusable BADGE colors helper

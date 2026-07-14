@@ -97,59 +97,70 @@ interface NotificationItem {
   timestamp: string;
 }
 
+import { useShield } from '@/context/ShieldContext';
+
 function LiveFocusScreen() {
-  // 1. React Query setup for configuration parameters
-  const { data: configData } = useQuery({
-    queryKey: ['telemetryConfig'],
-    queryFn: fetchLiveTelemetryConfig,
-  });
+  const {
+    focusScore,
+    velocity: velocityVal,
+    activeActivity: activeWindow,
+    typingSpeed,
+    codeChanges,
+    windowConsistency,
+    queue,
+    notifications,
+    analytics,
+    demoModeActive: isSimulating,
+    startDemoSimulation,
+    stopDemoSimulation,
+  } = useShield();
 
   // Math parameters
-  const lambda = configData?.lambda ?? 0.15;
-  const deltaT = configData?.deltaT ?? 1.0;
-  const wK = configData?.kWeight ?? 0.3;
-  const wC = configData?.cWeight ?? 0.5;
-  const wA = configData?.aWeight ?? 0.2;
+  const lambda = 0.15;
+  const deltaT = 1.0;
+  const wK = 0.3;
+  const wC = 0.5;
+  const wA = 0.2;
 
-  // 2. States for variables
-  const [focusScore, setFocusScore] = useState(82);
-  const [focusState, setFocusState] = useState<'Deep Focus' | 'Focused' | 'Normal' | 'Distracted' | 'Idle'>('Deep Focus');
-  const [isSimulating, setIsSimulating] = useState(true);
-  
-  // Raw Telemetry State
-  const [typingSpeed, setTypingSpeed] = useState(74); // WPM
-  const [codeChanges, setCodeChanges] = useState(120); // additions/deletions count
-  const [windowConsistency, setWindowConsistency] = useState(88); // % spent in core app
-  const [mouseActivity, setMouseActivity] = useState(42); // events per min
-  const [activeWindow, setActiveWindow] = useState('VS Code');
-  
-  // Math Calculations display
-  const [kNorm, setKNorm] = useState(0.74);
-  const [cNorm, setCNorm] = useState(0.6);
-  const [aNorm, setANorm] = useState(0.88);
-  const [velocityVal, setVelocityVal] = useState(69.8); // V score
+  const focusState = focusScore >= 80 ? 'Deep Focus' : focusScore >= 60 ? 'Focused' : focusScore >= 40 ? 'Normal' : focusScore >= 20 ? 'Distracted' : 'Idle';
+  const mouseActivity = Math.max(10, Math.floor(velocityVal * 0.6));
+  const kNorm = parseFloat((typingSpeed / 100).toFixed(2));
+  const cNorm = parseFloat(Math.min(codeChanges / 250, 1.0).toFixed(2));
+  const aNorm = parseFloat((windowConsistency / 100).toFixed(2));
 
   // Score History (15 seconds of logs)
   const [history, setHistory] = useState<number[]>([76, 78, 77, 80, 81, 79, 82, 83, 80, 82, 84, 85, 83, 81, 82]);
 
-  // Timeline Events
-  const [timeline, setTimeline] = useState([
-    { id: '1', time: '22:30', event: 'Typing cadence spiked to 85 WPM', type: 'success' },
-    { id: '2', time: '22:32', event: 'Focus entered Deep Focus phase', type: 'focus' },
-    { id: '3', time: '22:33', event: 'Blocked notification (Slack: "Lunch?")', type: 'block' },
-    { id: '4', time: '22:34', event: 'Allowed critical alert (Production node CPU)', type: 'alert' },
-  ]);
+  useEffect(() => {
+    setHistory(prev => {
+      const nextHistory = [...prev.slice(1), focusScore];
+      return nextHistory;
+    });
+  }, [focusScore]);
+
+  // Sync timeline with block events
+  const timeline = useMemo(() => {
+    return notifications.slice(0, 4).map((n) => ({
+      id: n.id,
+      time: n.time,
+      event: n.status === 'Blocked' ? `Blocked notification (${n.sender}: "${n.title}")` : `Allowed alert (${n.sender}: "${n.title}")`,
+      type: n.status === 'Blocked' ? 'block' : 'alert',
+    }));
+  }, [notifications]);
 
   // Floating Notification overlay state
-  const [currentNotification, setCurrentNotification] = useState<NotificationItem | null>(null);
+  const [currentNotification, setCurrentNotification] = useState<any | null>(null);
+  const prevNotificationId = useRef<string | null>(null);
 
-  // App notification counters (mock stats)
-  const [stats, setStats] = useState({
-    blockedCount: 28,
-    allowedCount: 4,
-    stabilityRating: 94,
-    trend: '+12% over 1hr',
-  });
+  // App notification counters
+  const stats = useMemo(() => {
+    return {
+      blockedCount: analytics.blockedNotif,
+      allowedCount: analytics.allowedNotif,
+      stabilityRating: analytics.attentionStability,
+      trend: '+12% over 1hr',
+    };
+  }, [analytics]);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -177,16 +188,33 @@ function LiveFocusScreen() {
     strokePercent.value = withTiming(focusScore / 100, { duration: 900, easing: Easing.out(Easing.quad) });
   }, [focusScore]);
 
-  // 4. Mathematical Engine Update Tick
-  const simulationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  
-  const getFocusStateLabel = (score: number) => {
-    if (score >= 80) return 'Deep Focus';
-    if (score >= 60) return 'Focused';
-    if (score >= 40) return 'Normal';
-    if (score >= 20) return 'Distracted';
-    return 'Idle';
-  };
+  // Listening to incoming notification updates to show floating toast popup
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const topNotif = notifications[0];
+      if (topNotif.id !== prevNotificationId.current) {
+        prevNotificationId.current = topNotif.id;
+        setCurrentNotification({
+          id: topNotif.id,
+          sender: topNotif.sender,
+          message: topNotif.message,
+          status: topNotif.status === 'Blocked' ? 'Blocked' : 'Allowed',
+          timestamp: topNotif.time,
+        });
+
+        notifyOpacity.value = 1;
+        notifyY.value = withSequence(withTiming(15, { duration: 400 }), withTiming(10, { duration: 200 }));
+
+        const timer = setTimeout(() => {
+          notifyOpacity.value = withTiming(0, { duration: 500 });
+          notifyY.value = withTiming(-20, { duration: 500 });
+          setCurrentNotification(null);
+        }, 3000);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [notifications]);
 
   const getFocusStateColor = (state: string) => {
     switch (state) {
@@ -198,169 +226,33 @@ function LiveFocusScreen() {
     }
   };
 
-  useEffect(() => {
+  const handleToggleSimulation = () => {
     if (isSimulating) {
-      simulationInterval.current = setInterval(() => {
-        // Randomly simulate small swings in developer telemetry
-        const factor = Math.random() > 0.5 ? 1 : -1;
-        const speedDelta = Math.floor(Math.random() * 8) * factor;
-        const changesDelta = Math.floor(Math.random() * 20) * factor;
-        const consistDelta = Math.floor(Math.random() * 5) * factor;
-
-        // Make sure values stay in reasonable boundaries
-        const newSpeed = Math.max(Math.min(typingSpeed + speedDelta, 115), 0);
-        const newCode = Math.max(Math.min(codeChanges + changesDelta, 380), 0);
-        const newConsist = Math.max(Math.min(windowConsistency + consistDelta, 100), 20);
-        const newMouse = Math.max(Math.min(mouseActivity + Math.floor(Math.random() * 10) * factor, 80), 5);
-
-        setTypingSpeed(newSpeed);
-        setCodeChanges(newCode);
-        setWindowConsistency(newConsist);
-        setMouseActivity(newMouse);
-
-        // Normalize
-        const kn = newSpeed / 100;
-        const cn = Math.min(newCode / 250, 1.0);
-        const an = newConsist / 100;
-
-        setKNorm(parseFloat(kn.toFixed(2)));
-        setCNorm(parseFloat(cn.toFixed(2)));
-        setANorm(parseFloat(an.toFixed(2)));
-
-        // V = wK * k_norm + wC * c_norm + wA * a_norm
-        const V = (wK * kn + wC * cn + wA * an) * 100;
-        setVelocityVal(parseFloat(V.toFixed(1)));
-
-        // FS = FS_prev * exp(-lambda*dt) + (1 - exp(-lambda*dt)) * V
-        const expTerm = Math.exp(-lambda * deltaT); // e.g. e^(-0.15 * 1.0) = 0.86
-        const newFS = focusScore * expTerm + (1 - expTerm) * V;
-        const roundedFS = Math.max(Math.min(Math.round(newFS), 100), 0);
-
-        setFocusScore(roundedFS);
-        
-        // State evaluation
-        const nextState = getFocusStateLabel(roundedFS);
-        if (nextState !== focusState) {
-          setFocusState(nextState);
-          setTimeline(prev => [
-            {
-              id: String(Date.now()),
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              event: `Focus state transitioned to ${nextState}`,
-              type: 'focus',
-            },
-            ...prev.slice(0, 5)
-          ]);
-        }
-
-        // Update score history
-        setHistory((prev) => [...prev.slice(1), roundedFS]);
-
-        // Random floating notification simulation (approx 20% chance per second)
-        if (Math.random() < 0.25) {
-          triggerNotificationAlert();
-        }
-
-      }, 1000);
+      stopDemoSimulation();
+      showToast('Simulation Paused');
     } else {
-      if (simulationInterval.current) clearInterval(simulationInterval.current);
+      startDemoSimulation();
+      showToast('Simulation Started');
     }
-
-    return () => {
-      if (simulationInterval.current) clearInterval(simulationInterval.current);
-    };
-  }, [isSimulating, typingSpeed, codeChanges, windowConsistency, mouseActivity, focusScore, focusState]);
-
-  // Floating Notification Trigger
-  const triggerNotificationAlert = () => {
-    const alerts: Omit<NotificationItem, 'id' | 'timestamp'>[] = [
-      { sender: 'Slack', message: 'Lunch?', status: 'Blocked' },
-      { sender: 'Discord', message: 'New message in gaming channel', status: 'Blocked' },
-      { sender: 'PagerDuty', message: 'Production Server Down (Critical Node 3)', status: 'Allowed' },
-      { sender: 'Slack', message: 'CEO: Urgently need Q3 report', status: 'Allowed' },
-      { sender: 'Calendar', message: 'Meeting starting in 5 minutes', status: 'Allowed' },
-      { sender: 'Jira', message: 'Ticket #421 moved to done', status: 'Blocked' },
-    ];
-
-    const pick = alerts[Math.floor(Math.random() * alerts.length)];
-    const newItem: NotificationItem = {
-      ...pick,
-      id: String(Date.now()),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-    };
-
-    setCurrentNotification(newItem);
-    
-    // Increment logs stats
-    if (pick.status === 'Blocked') {
-      setStats(prev => ({ ...prev, blockedCount: prev.blockedCount + 1 }));
-    } else {
-      setStats(prev => ({ ...prev, allowedCount: prev.allowedCount + 1 }));
-    }
-
-    // Add to timeline
-    setTimeline(prev => [
-      {
-        id: String(Date.now()),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        event: `${pick.status === 'Blocked' ? 'Blocked' : 'Delivered'} ping: ${pick.sender}`,
-        type: pick.status === 'Blocked' ? 'block' : 'alert',
-      },
-      ...prev.slice(0, 5)
-    ]);
-
-    // Animate pop-in
-    notifyOpacity.value = 0;
-    notifyY.value = -30;
-    
-    notifyOpacity.value = withTiming(1, { duration: 400 });
-    notifyY.value = withTiming(0, { duration: 400 });
-
-    // Auto dismiss after 3 seconds
-    setTimeout(() => {
-      notifyOpacity.value = withTiming(0, { duration: 300 });
-      notifyY.value = withTiming(-20, { duration: 300 }, (finished) => {
-        if (finished) {
-          // Reset status on UI thread safely
-        }
-      });
-    }, 3000);
-  };
-
-  // Demo Command Boosts
-  const handleIncreaseFocus = () => {
-    showToast('Injecting high cognitive input boost');
-    setTypingSpeed(95);
-    setCodeChanges(240);
-    setWindowConsistency(98);
-    setMouseActivity(55);
-    setActiveWindow('VS Code (index.tsx)');
-  };
-
-  const handleDecreaseFocus = () => {
-    showToast('Simulating distraction interrupt');
-    setTypingSpeed(15);
-    setCodeChanges(5);
-    setWindowConsistency(30);
-    setMouseActivity(75); // fast frantic clicks
-    setActiveWindow('Google Chrome (YouTube)');
   };
 
   const handleResetSimulation = () => {
-    showToast('Resetting Live Telemetry calculations');
-    setFocusScore(82);
-    setFocusState('Deep Focus');
-    setTypingSpeed(74);
-    setCodeChanges(120);
-    setWindowConsistency(88);
-    setMouseActivity(42);
-    setKNorm(0.74);
-    setCNorm(0.48);
-    setANorm(0.88);
-    setVelocityVal(69.8);
-    setHistory([76, 78, 77, 80, 81, 79, 82, 83, 80, 82, 84, 85, 83, 81, 82]);
-    setCurrentNotification(null);
+    stopDemoSimulation();
+    showToast('Simulation Reset');
   };
+
+
+  // Demo Command Boosts
+  const handleIncreaseFocus = () => {
+    startDemoSimulation();
+    showToast('Demo Simulation Initiated');
+  };
+
+  const handleDecreaseFocus = () => {
+    stopDemoSimulation();
+    showToast('Simulation Halted');
+  };
+
 
   // 5. Custom SVG Graph Rendering
   // The graph is width - 40, height is 120. We render 15 points.
@@ -598,7 +490,7 @@ function LiveFocusScreen() {
             <View style={styles.controlBtnRow}>
               
               <TouchableOpacity
-                onPress={() => setIsSimulating(!isSimulating)}
+                onPress={handleToggleSimulation}
                 style={[styles.btnControl, isSimulating ? styles.btnActiveRed : styles.btnActiveGreen]}>
                 {isSimulating ? (
                   <>
