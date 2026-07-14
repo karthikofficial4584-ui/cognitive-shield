@@ -33,6 +33,9 @@ export default function AppTabs() {
           <TabTrigger name="queue" href={"/queue" as any} asChild>
             <TabButton>Queue</TabButton>
           </TabTrigger>
+          <TabTrigger name="analytics" href={"/analytics" as any} asChild>
+            <TabButton>Analytics</TabButton>
+          </TabTrigger>
         </CustomTabList>
       </TabList>
     </Tabs>
