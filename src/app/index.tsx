@@ -1,98 +1,1614 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions,
+  Platform,
+  StatusBar,
+  SafeAreaView,
+  ActivityIndicator,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedProps,
+  withTiming,
+  withRepeat,
+  withSequence,
+  Easing,
+  useDerivedValue,
+} from 'react-native-reanimated';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import {
+  Shield,
+  Activity,
+  Bell,
+  Play,
+  Square,
+  BarChart2,
+  Clock,
+  Calendar,
+  Zap,
+  AlertTriangle,
+  Cpu,
+  Layers,
+  Sparkles,
+  TrendingUp,
+  Keyboard,
+  FileCode,
+  Laptop,
+  CheckCircle2,
+  Wifi,
+  Database,
+  Link,
+  User,
+  Home,
+  Sliders,
+  LogOut,
+  Info,
+} from 'lucide-react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const { width } = Dimensions.get('window');
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+// Create a query client for React Query
+const queryClient = new QueryClient();
+
+// Animated components for Reanimated SVG animations
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedView = Animated.createAnimatedComponent(View);
+
+// Axios mock client
+const mockClient = axios.create({
+  baseURL: 'https://api.cognitiveshield.mock',
+});
+
+// Mock service layer
+const fetchDashboardData = async () => {
+  // Simulate API fetch delay
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  return {
+    focusScore: 85,
+    focusState: 'Deep Focus',
+    typingSpeed: 78,
+    codeChanges: 142,
+    windowActivity: 3,
+    velocityScore: 84,
+    deepFocusTime: '4h 12m',
+    notificationsBlocked: 42,
+    criticalAlerts: 3,
+    queuedNotifications: 12,
+    productivityScore: 92,
+  };
+};
 
 export default function HomeScreen() {
   return (
-    <ThemedView style={styles.container}>
+    <QueryClientProvider client={queryClient}>
+      <DashboardScreen />
+    </QueryClientProvider>
+  );
+}
+
+function DashboardScreen() {
+  // 1. React Query Setup
+  const { data: initialData, refetch, isFetching } = useQuery({
+    queryKey: ['dashboardData'],
+    queryFn: fetchDashboardData,
+  });
+
+  // 2. Local State Management
+  const [focusScore, setFocusScore] = useState(85);
+  const [focusState, setFocusState] = useState<'Deep Focus' | 'Focused' | 'Normal' | 'Distracted' | 'Idle'>('Deep Focus');
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [queueCount, setQueueCount] = useState(12);
+  const [notificationsBlocked, setNotificationsBlocked] = useState(42);
+  const [criticalAlerts, setCriticalAlerts] = useState(3);
+  const [deepFocusTime, setDeepFocusTime] = useState('4h 12m');
+  const [productivityScore, setProductivityScore] = useState(92);
+  
+  const [typingSpeed, setTypingSpeed] = useState(78);
+  const [codeChanges, setCodeChanges] = useState(142);
+  const [windowActivity, setWindowActivity] = useState(3);
+  const [velocityScore, setVelocityScore] = useState(84);
+  const [currentTab, setCurrentTab] = useState<'home' | 'live' | 'notifications' | 'analytics' | 'profile'>('home');
+
+  const [currentTime, setCurrentTime] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
+
+  // Timeline Activity Log State
+  const [timeline, setTimeline] = useState([
+    { id: '1', time: '22:10', title: 'Focus Increased', desc: 'Score spiked to 92. Entered Deep Focus', type: 'success' },
+    { id: '2', time: '22:12', title: 'Notification Blocked', desc: 'Distraction from Slack intercepted', type: 'block' },
+    { id: '3', time: '22:15', title: 'Critical Alert Allowed', desc: 'Production server latency warning', type: 'warning' },
+    { id: '4', time: '22:20', title: 'Queue Released', desc: 'Delivered 8 buffered non-urgent pings', type: 'release' },
+  ]);
+
+  // Toast notification for user actions
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Time ticker
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setCurrentDate(now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sync with initial query data when loaded
+  useEffect(() => {
+    if (initialData) {
+      setFocusScore(initialData.focusScore);
+      setFocusState(initialData.focusState as any);
+      setTypingSpeed(initialData.typingSpeed);
+      setCodeChanges(initialData.codeChanges);
+      setWindowActivity(initialData.windowActivity);
+      setVelocityScore(initialData.velocityScore);
+      setDeepFocusTime(initialData.deepFocusTime);
+      setNotificationsBlocked(initialData.notificationsBlocked);
+      setCriticalAlerts(initialData.criticalAlerts);
+      setQueueCount(initialData.queuedNotifications);
+      setProductivityScore(initialData.productivityScore);
+    }
+  }, [initialData]);
+
+  // 3. Demo Mode Simulation Loop
+  const demoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const demoStepRef = useRef(0);
+
+  useEffect(() => {
+    if (isDemoMode) {
+      showToast('Demo Mode Activated - Simulating workflow lifecycle');
+      const steps = [
+        {
+          score: 96,
+          state: 'Deep Focus' as const,
+          typing: 88,
+          code: 245,
+          windows: 1,
+          velocity: 95,
+          prod: 98,
+          alert: 'Focus level optimum. Extraneous apps disabled.',
+          time: '22:23',
+        },
+        {
+          score: 76,
+          state: 'Focused' as const,
+          typing: 72,
+          code: 110,
+          windows: 2,
+          velocity: 78,
+          prod: 88,
+          alert: 'Slack ping queued silently. Focus maintained.',
+          time: '22:24',
+        },
+        {
+          score: 52,
+          state: 'Normal' as const,
+          typing: 45,
+          code: 40,
+          windows: 4,
+          velocity: 60,
+          prod: 72,
+          alert: 'Increased window changes detected.',
+          time: '22:25',
+        },
+        {
+          score: 28,
+          state: 'Distracted' as const,
+          typing: 15,
+          code: 5,
+          windows: 9,
+          velocity: 32,
+          prod: 45,
+          alert: 'High multitasking rate. Audio alert suggested.',
+          time: '22:26',
+        },
+        {
+          score: 12,
+          state: 'Idle' as const,
+          typing: 0,
+          code: 0,
+          windows: 0,
+          velocity: 10,
+          prod: 30,
+          alert: 'Telemetry inactive. User away from keyboard.',
+          time: '22:27',
+        },
+      ];
+
+      demoIntervalRef.current = setInterval(() => {
+        const step = steps[demoStepRef.current];
+        setFocusScore(step.score);
+        setFocusState(step.state);
+        setTypingSpeed(step.typing);
+        setCodeChanges(step.code);
+        setWindowActivity(step.windows);
+        setVelocityScore(step.velocity);
+        setProductivityScore(step.prod);
+
+        // Append to activity timeline
+        const newEvent = {
+          id: String(Date.now()),
+          time: step.time,
+          title: `State: ${step.state}`,
+          desc: step.alert,
+          type: step.score > 70 ? 'success' : step.score > 40 ? 'warning' : 'block',
+        };
+        setTimeline((prev) => [newEvent, ...prev.slice(0, 5)]);
+
+        if (step.score < 40) {
+          setNotificationsBlocked((prev) => prev + 1);
+          setQueueCount((prev) => prev + 1);
+        }
+
+        demoStepRef.current = (demoStepRef.current + 1) % steps.length;
+      }, 4000);
+    } else {
+      if (demoIntervalRef.current) {
+        clearInterval(demoIntervalRef.current);
+        showToast('Demo Mode Deactivated');
+      }
+    }
+
+    return () => {
+      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
+    };
+  }, [isDemoMode]);
+
+  // Toast Helper
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  // Quick Action Handlers
+  const handleToggleFocusMode = () => {
+    setIsFocusMode(!isFocusMode);
+    if (!isFocusMode) {
+      setFocusScore(95);
+      setFocusState('Deep Focus');
+      showToast('Focus Mode Engaged: High-priority queue enabled');
+      // Log event
+      setTimeline((prev) => [
+        {
+          id: String(Date.now()),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          title: 'Shield Engaged',
+          desc: 'High-priority focus guard active. Blocked all non-critical API requests.',
+          type: 'success',
+        },
+        ...prev.slice(0, 5),
+      ]);
+    } else {
+      setFocusScore(65);
+      setFocusState('Normal');
+      showToast('Focus Mode Disengaged');
+    }
+  };
+
+  const handleReleaseQueue = () => {
+    if (queueCount === 0) {
+      showToast('Queue is empty');
+      return;
+    }
+    const releasedCount = queueCount;
+    setQueueCount(0);
+    setNotificationsBlocked((prev) => prev + releasedCount);
+    showToast(`Released ${releasedCount} notifications successfully`);
+    setTimeline((prev) => [
+      {
+        id: String(Date.now()),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        title: 'Queue Released',
+        desc: `Batch delivered ${releasedCount} notifications to user inbox.`,
+        type: 'release',
+      },
+      ...prev.slice(0, 5),
+    ]);
+  };
+
+  const handleRefreshData = () => {
+    refetch().then(() => {
+      showToast('API Data Refetched via React Query');
+    });
+  };
+
+  // 4. Shared Animation Values
+  const pulseOpacity = useSharedValue(0.6);
+  const wave1Translation = useSharedValue(0);
+  const wave2Translation = useSharedValue(0);
+  const waveScaleY = useSharedValue(1);
+
+  // Focus score gauge progress animation
+  const focusScoreShared = useSharedValue(85);
+
+  useEffect(() => {
+    focusScoreShared.value = withTiming(focusScore, { duration: 1000, easing: Easing.out(Easing.quad) });
+  }, [focusScore]);
+
+  // Pulsing telemetry glow effect
+  useEffect(() => {
+    pulseOpacity.value = withRepeat(
+      withSequence(withTiming(1, { duration: 1000 }), withTiming(0.4, { duration: 1000 })),
+      -1,
+      true
+    );
+  }, []);
+
+  // Continuous Wave horizontal scroll animation
+  useEffect(() => {
+    wave1Translation.value = withRepeat(
+      withTiming(-300, { duration: 7000, easing: Easing.linear }),
+      -1,
+      false
+    );
+    wave2Translation.value = withRepeat(
+      withTiming(300, { duration: 9000, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, []);
+
+  // Wave amplitude adjusts dynamically to focus score (calmer wave for higher score, chaotic for lower score)
+  useEffect(() => {
+    const targetScale = 1.6 - (focusScore / 100); // 0.6 (flat/calm) to 1.6 (turbulent)
+    waveScaleY.value = withTiming(targetScale, { duration: 1200 });
+  }, [focusScore]);
+
+  // Derived gauge path calculations
+  const RADIUS = 70;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  
+  const animatedGaugeProps = useAnimatedProps(() => {
+    const strokeOffset = CIRCUMFERENCE * (1 - focusScoreShared.value / 100);
+    return {
+      strokeDashoffset: strokeOffset,
+    };
+  });
+
+  // Animated styles
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+  }));
+
+  const waveContainerStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleY: waveScaleY.value }],
+  }));
+
+  const wave1Style = useAnimatedStyle(() => ({
+    transform: [{ translateX: wave1Translation.value }],
+  }));
+
+  const wave2Style = useAnimatedStyle(() => ({
+    transform: [{ translateX: -wave2Translation.value }],
+  }));
+
+  // Helper to determine focus score colors
+  const getFocusColors = (score: number) => {
+    if (score >= 80) return { primary: '#3B82F6', secondary: '#8B5CF6', text: '#A855F7', label: 'Deep Focus', track: 'rgba(139, 92, 246, 0.15)' };
+    if (score >= 60) return { primary: '#06B6D4', secondary: '#3B82F6', text: '#3B82F6', label: 'Focused', track: 'rgba(59, 130, 246, 0.15)' };
+    if (score >= 40) return { primary: '#10B981', secondary: '#06B6D4', text: '#10B981', label: 'Normal', track: 'rgba(16, 185, 129, 0.15)' };
+    if (score >= 20) return { primary: '#F59E0B', secondary: '#EF4444', text: '#F59E0B', label: 'Distracted', track: 'rgba(245, 158, 11, 0.15)' };
+    return { primary: '#EF4444', secondary: '#B91C1C', text: '#EF4444', label: 'Idle', track: 'rgba(239, 68, 68, 0.15)' };
+  };
+
+  const focusColors = getFocusColors(focusScore);
+
+  return (
+    <LinearGradient
+      colors={['#07080D', '#0F0E23', '#1A0C2F']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0.8, y: 1 }}
+      style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
+      {/* TOP HEADER SECTION */}
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greetingText}>Hello, Commander</Text>
+            <View style={styles.dateTimeRow}>
+              <Clock size={13} color="#94A3B8" style={{ marginRight: 4 }} />
+              <Text style={styles.dateText}>{currentTime}</Text>
+              <Text style={styles.dateDivider}>|</Text>
+              <Calendar size={13} color="#94A3B8" style={{ marginRight: 4 }} />
+              <Text style={styles.dateText}>{currentDate}</Text>
+            </View>
+          </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+          {/* User Profile Avatar with monitoring status border ring */}
+          <View style={styles.avatarContainer}>
+            <LinearGradient
+              colors={['#8B5CF6', '#3B82F6']}
+              style={styles.avatarBorder}>
+              <View style={styles.avatarInner}>
+                <User size={22} color="#FFF" />
+              </View>
+            </LinearGradient>
+            {/* Status dot */}
+            <AnimatedView style={[styles.statusDot, pulseStyle]} />
+          </View>
+        </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        {/* Global monitoring bar */}
+        <View style={styles.monitoringBar}>
+          <View style={styles.monitoringIndicator}>
+            <View style={[styles.indicatorLight, { backgroundColor: '#10B981' }]} />
+            <Text style={styles.monitoringText}>Shield Monitoring Active</Text>
+          </View>
+          {isFetching ? (
+            <ActivityIndicator size="small" color="#8B5CF6" />
+          ) : (
+            <TouchableOpacity onPress={handleRefreshData} style={styles.syncBtn}>
+              <Activity size={14} color="#A855F7" />
+              <Text style={styles.syncText}>Sync</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
+        {/* TOAST POPUP */}
+        {toastMessage && (
+          <LinearGradient
+            colors={['#3B82F6', '#8B5CF6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.toastContainer}>
+            <Info size={16} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </LinearGradient>
+        )}
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}>
+
+          {/* FOCUS SCORE CIRCULAR GAUGE */}
+          <View style={styles.glassCard}>
+            <Text style={styles.cardTitle}>Live Focus Score</Text>
+            
+            <View style={styles.gaugeContainer}>
+              <Svg width={180} height={180} viewBox="0 0 160 160">
+                <Defs>
+                  <SvgGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <Stop offset="0%" stopColor={focusColors.primary} />
+                    <Stop offset="100%" stopColor={focusColors.secondary} />
+                  </SvgGradient>
+                </Defs>
+                
+                {/* Background Track Circle */}
+                <Circle
+                  cx="80"
+                  cy="80"
+                  r={RADIUS}
+                  fill="transparent"
+                  stroke="rgba(255, 255, 255, 0.05)"
+                  strokeWidth="8"
+                />
+                
+                {/* Score highlight glow track */}
+                <Circle
+                  cx="80"
+                  cy="80"
+                  r={RADIUS}
+                  fill="transparent"
+                  stroke={focusColors.track}
+                  strokeWidth="16"
+                />
+
+                {/* Animated progress circle */}
+                <AnimatedCircle
+                  cx="80"
+                  cy="80"
+                  r={RADIUS}
+                  fill="transparent"
+                  stroke="url(#gaugeGradient)"
+                  strokeWidth="10"
+                  strokeDasharray={`${CIRCUMFERENCE}`}
+                  strokeLinecap="round"
+                  animatedProps={animatedGaugeProps}
+                  transform={`rotate(-90 80 80)`}
+                />
+              </Svg>
+
+              {/* Gauge central text overlay */}
+              <View style={styles.gaugeCenterText}>
+                <Text style={styles.gaugeScore}>{focusScore}</Text>
+                <Text style={[styles.gaugeState, { color: focusColors.text }]}>{focusState.toUpperCase()}</Text>
+              </View>
+            </View>
+
+            {/* Score interpretation */}
+            <View style={styles.gaugeFooter}>
+              <Shield size={16} color={focusColors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.gaugeFooterText}>
+                Current status is <Text style={{ color: focusColors.primary, fontWeight: '700' }}>{focusState}</Text>
+              </Text>
+            </View>
+          </View>
+
+          {/* FOCUS WAVE ANIMATED SVG */}
+          <View style={styles.glassCardNoPadding}>
+            <View style={styles.waveHeader}>
+              <View>
+                <Text style={styles.waveTitle}>Neural Waveform</Text>
+                <Text style={styles.waveSubtitle}>Real-time EEG telemetry simulation</Text>
+              </View>
+              <Zap size={18} color={focusColors.primary} />
+            </View>
+
+            {/* Moving SVG Waves Container */}
+            <View style={styles.waveContainer}>
+              <AnimatedView style={[styles.waveOffsetWrapper, waveContainerStyle]}>
+                
+                {/* Wave 1 */}
+                <AnimatedView style={[styles.waveVector, wave1Style]}>
+                  <Svg width={800} height={120} viewBox="0 0 800 120" preserveAspectRatio="none">
+                    <Defs>
+                      <SvgGradient id="wave1Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <Stop offset="0%" stopColor="#3B82F6" stopOpacity="0.4" />
+                        <Stop offset="50%" stopColor="#8B5CF6" stopOpacity="0.6" />
+                        <Stop offset="100%" stopColor="#3B82F6" stopOpacity="0.4" />
+                      </SvgGradient>
+                    </Defs>
+                    <Path
+                      d="M0,60 C150,110 250,10 400,60 C550,110 650,10 800,60 L800,120 L0,120 Z"
+                      fill="url(#wave1Grad)"
+                    />
+                  </Svg>
+                </AnimatedView>
+
+                {/* Wave 2 */}
+                <AnimatedView style={[styles.waveVector, wave2Style, { top: 5 }]}>
+                  <Svg width={800} height={120} viewBox="0 0 800 120" preserveAspectRatio="none">
+                    <Defs>
+                      <SvgGradient id="wave2Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <Stop offset="0%" stopColor="#A855F7" stopOpacity="0.3" />
+                        <Stop offset="50%" stopColor="#EC4899" stopOpacity="0.5" />
+                        <Stop offset="100%" stopColor="#A855F7" stopOpacity="0.3" />
+                      </SvgGradient>
+                    </Defs>
+                    <Path
+                      d="M0,70 C120,20 280,100 400,70 C520,20 680,100 800,70 L800,120 L0,120 Z"
+                      fill="url(#wave2Grad)"
+                    />
+                  </Svg>
+                </AnimatedView>
+
+              </AnimatedView>
+
+              {/* Status overlay on wave */}
+              <View style={styles.waveOverlay}>
+                <Text style={styles.waveStateValue}>{focusScore} Hz</Text>
+                <Text style={styles.waveStateLabel}>Resonance Frequency</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* COGNITIVE VELOCITY CARD */}
+          <View style={styles.glassCard}>
+            <View style={styles.velocityHeader}>
+              <View style={styles.row}>
+                <Activity size={18} color="#A855F7" style={{ marginRight: 8 }} />
+                <Text style={styles.cardTitle}>Cognitive Velocity</Text>
+              </View>
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>{velocityScore} VS</Text>
+              </View>
+            </View>
+
+            <Text style={styles.velocityDesc}>
+              Measures work cadence, input rate, and program-switching velocity.
+            </Text>
+
+            {/* Velocity metrics progress bars */}
+            <View style={styles.progressItem}>
+              <View style={styles.progressLabelRow}>
+                <View style={styles.row}>
+                  <Keyboard size={14} color="#3B82F6" style={{ marginRight: 6 }} />
+                  <Text style={styles.progressLabel}>Typing Cadence</Text>
+                </View>
+                <Text style={styles.progressValue}>{typingSpeed} WPM</Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${(typingSpeed / 120) * 100}%`, backgroundColor: '#3B82F6' }]} />
+              </View>
+            </View>
+
+            <View style={styles.progressItem}>
+              <View style={styles.progressLabelRow}>
+                <View style={styles.row}>
+                  <FileCode size={14} color="#8B5CF6" style={{ marginRight: 6 }} />
+                  <Text style={styles.progressLabel}>Code Modifications</Text>
+                </View>
+                <Text style={styles.progressValue}>+{codeChanges} Lines</Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${Math.min((codeChanges / 400) * 100, 100)}%`, backgroundColor: '#8B5CF6' }]} />
+              </View>
+            </View>
+
+            <View style={styles.progressItem}>
+              <View style={styles.progressLabelRow}>
+                <View style={styles.row}>
+                  <Laptop size={14} color="#D946EF" style={{ marginRight: 6 }} />
+                  <Text style={styles.progressLabel}>Window Turbulence</Text>
+                </View>
+                <Text style={styles.progressValue}>{windowActivity} Active Apps</Text>
+              </View>
+              {/* Progress bar fill for window activity is reversed, because fewer window activity is better for focus */}
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${Math.max(100 - (windowActivity * 10), 10)}%`, backgroundColor: '#D946EF' }]} />
+              </View>
+            </View>
+          </View>
+
+          {/* AI INSIGHT CARD */}
+          <LinearGradient
+            colors={['rgba(139, 92, 246, 0.15)', 'rgba(59, 130, 246, 0.05)']}
+            style={styles.aiInsightCard}>
+            <View style={styles.row}>
+              <Sparkles size={18} color="#D946EF" style={{ marginRight: 8 }} />
+              <Text style={styles.aiTitle}>Cognitive AI Shield Insight</Text>
+            </View>
+            <View style={styles.aiMetricsRow}>
+              <View style={styles.aiMetricCell}>
+                <Text style={styles.aiMetricLabel}>Today's Productivity</Text>
+                <Text style={styles.aiMetricVal}>Excellent</Text>
+              </View>
+              <View style={styles.aiMetricCell}>
+                <Text style={styles.aiMetricLabel}>Diverted Interruptions</Text>
+                <Text style={styles.aiMetricValPink}>{notificationsBlocked + 12}</Text>
+              </View>
+            </View>
+            <View style={styles.aiDivider} />
+            <Text style={styles.aiRecommendationTitle}>Recommendation</Text>
+            <Text style={styles.aiRecommendationText}>
+              Your deep focus is trending 15% higher than yesterday. Avoid opening communication client suites. We recommend continuing deep focus for another 35 minutes to complete your current task.
+            </Text>
+          </LinearGradient>
+
+          {/* TODAY'S SUMMARY GRID */}
+          <Text style={styles.sectionHeading}>Today's Summary</Text>
+          <View style={styles.summaryGrid}>
+            
+            {/* Card 1 */}
+            <View style={styles.summaryGridCard}>
+              <Clock size={16} color="#3B82F6" style={{ marginBottom: 8 }} />
+              <Text style={styles.gridCardValue}>{deepFocusTime}</Text>
+              <Text style={styles.gridCardLabel}>Deep Focus Time</Text>
+            </View>
+
+            {/* Card 2 */}
+            <View style={styles.summaryGridCard}>
+              <Shield size={16} color="#10B981" style={{ marginBottom: 8 }} />
+              <Text style={styles.gridCardValue}>{notificationsBlocked}</Text>
+              <Text style={styles.gridCardLabel}>Blocked Pings</Text>
+            </View>
+
+            {/* Card 3 */}
+            <View style={styles.summaryGridCard}>
+              <AlertTriangle size={16} color="#EF4444" style={{ marginBottom: 8 }} />
+              <Text style={styles.gridCardValue}>{criticalAlerts}</Text>
+              <Text style={styles.gridCardLabel}>Allowed Alerts</Text>
+            </View>
+
+            {/* Card 4 */}
+            <View style={styles.summaryGridCard}>
+              <Layers size={16} color="#F59E0B" style={{ marginBottom: 8 }} />
+              <Text style={styles.gridCardValue}>{queueCount}</Text>
+              <Text style={styles.gridCardLabel}>Queued Logs</Text>
+            </View>
+
+            {/* Card 5 - Full Width Grid Card */}
+            <View style={[styles.summaryGridCard, { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 }]}>
+              <View style={styles.row}>
+                <TrendingUp size={20} color="#10B981" style={{ marginRight: 12 }} />
+                <View>
+                  <Text style={styles.gridCardLabel}>Overall Productivity Rating</Text>
+                  <Text style={styles.productivityStatus}>Above baseline average</Text>
+                </View>
+              </View>
+              <Text style={styles.gridCardLargeValue}>{productivityScore}%</Text>
+            </View>
+
+          </View>
+
+          {/* QUICK ACTIONS SECTION */}
+          <Text style={styles.sectionHeading}>Quick Actions</Text>
+          <View style={styles.actionsGrid}>
+            
+            <TouchableOpacity
+              onPress={() => setIsDemoMode(!isDemoMode)}
+              style={[styles.actionButton, isDemoMode ? styles.actionActive : styles.actionInactive]}>
+              {isDemoMode ? (
+                <Square size={16} color="#FFF" style={{ marginRight: 8 }} />
+              ) : (
+                <Play size={16} color="#FFF" style={{ marginRight: 8 }} />
+              )}
+              <Text style={styles.actionBtnText}>
+                {isDemoMode ? 'Stop Demo' : 'Start Demo'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleToggleFocusMode}
+              style={[styles.actionButton, isFocusMode ? styles.actionActivePurple : styles.actionInactive]}>
+              <Shield size={16} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.actionBtnText}>
+                {isFocusMode ? 'Focus Active' : 'Focus Mode'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleReleaseQueue}
+              style={[styles.actionButton, styles.actionInactive]}>
+              <Layers size={16} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.actionBtnText}>Release Queue</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => showToast('Redirecting to Analytics metrics tab...')}
+              style={[styles.actionButton, styles.actionInactive]}>
+              <BarChart2 size={16} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.actionBtnText}>View Analytics</Text>
+            </TouchableOpacity>
+
+          </View>
+
+          {/* LIVE STATUS PANEL */}
+          <View style={styles.glassCard}>
+            <Text style={styles.cardTitle}>Shield Telemetry Status</Text>
+            <View style={styles.statusList}>
+              
+              <View style={styles.statusRow}>
+                <View style={styles.row}>
+                  <Shield size={14} color="#10B981" style={{ marginRight: 8 }} />
+                  <Text style={styles.statusLabel}>Monitoring Shield</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.statusStateOk}>ACTIVE</Text>
+                  <AnimatedView style={[styles.statusIndicatorPulse, pulseStyle, { backgroundColor: '#10B981' }]} />
+                </View>
+              </View>
+
+              <View style={styles.statusRow}>
+                <View style={styles.row}>
+                  <Wifi size={14} color="#3B82F6" style={{ marginRight: 8 }} />
+                  <Text style={styles.statusLabel}>Telemetry Stream</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.statusStateOk}>CONNECTED</Text>
+                  <AnimatedView style={[styles.statusIndicatorPulse, pulseStyle, { backgroundColor: '#3B82F6' }]} />
+                </View>
+              </View>
+
+              <View style={styles.statusRow}>
+                <View style={styles.row}>
+                  <Database size={14} color="#8B5CF6" style={{ marginRight: 8 }} />
+                  <Text style={styles.statusLabel}>Backend Node</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.statusStateOk}>CONNECTED</Text>
+                  <AnimatedView style={[styles.statusIndicatorPulse, pulseStyle, { backgroundColor: '#8B5CF6' }]} />
+                </View>
+              </View>
+
+              <View style={styles.statusRow}>
+                <View style={styles.row}>
+                  <Link size={14} color="#06B6D4" style={{ marginRight: 8 }} />
+                  <Text style={styles.statusLabel}>API Service Gateway</Text>
+                </View>
+                <Text style={styles.statusStateInfo}>ONLINE (200 OK)</Text>
+              </View>
+
+              <View style={styles.statusRow}>
+                <View style={styles.row}>
+                  <Layers size={14} color="#F59E0B" style={{ marginRight: 8 }} />
+                  <Text style={styles.statusLabel}>Buffered Queue Cache</Text>
+                </View>
+                <Text style={styles.statusStateWarning}>{queueCount} items delayed</Text>
+              </View>
+
+            </View>
+          </View>
+
+          {/* RECENT ACTIVITY TIMELINE */}
+          <View style={styles.glassCard}>
+            <Text style={styles.cardTitle}>Recent Focus Timeline</Text>
+            <View style={styles.timelineContainer}>
+              {timeline.map((item, index) => (
+                <View key={item.id} style={styles.timelineItem}>
+                  
+                  {/* Left timeline indicators */}
+                  <View style={styles.timelineLeft}>
+                    <Text style={styles.timelineTime}>{item.time}</Text>
+                    <View style={styles.timelineLineWrapper}>
+                      <View style={[styles.timelineNode, 
+                        item.type === 'success' ? styles.nodeSuccess :
+                        item.type === 'warning' ? styles.nodeWarning : styles.nodeBlock
+                      ]} />
+                      {index < timeline.length - 1 && <View style={styles.timelineLine} />}
+                    </View>
+                  </View>
+
+                  {/* Right timeline details */}
+                  <View style={styles.timelineRight}>
+                    <Text style={styles.timelineTitleText}>{item.title}</Text>
+                    <Text style={styles.timelineDescText}>{item.desc}</Text>
+                  </View>
+
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Footer warning */}
+          <View style={styles.footerInfo}>
+            <CheckCircle2 size={12} color="#94A3B8" style={{ marginRight: 6 }} />
+            <Text style={styles.footerText}>Cognitive Shield v1.0.0 Enterprise • Secure Sandbox Mode</Text>
+          </View>
+
+        </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+
+      {/* FLOATING GLASSMORPHIC BOTTOM TAB NAVIGATION */}
+      <View style={styles.bottomTabContainer}>
+        <BlurFallbackContainer>
+          <View style={styles.bottomTabInner}>
+            
+            <TouchableOpacity
+              onPress={() => setCurrentTab('home')}
+              style={styles.tabItem}>
+              <Home size={20} color={currentTab === 'home' ? '#A855F7' : '#94A3B8'} />
+              <Text style={[styles.tabLabel, { color: currentTab === 'home' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'home' ? '700' : '400' }]}>
+                Home
+              </Text>
+              {currentTab === 'home' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setCurrentTab('live');
+                showToast('Switching to Live telemetry workspace...');
+              }}
+              style={styles.tabItem}>
+              <Activity size={20} color={currentTab === 'live' ? '#A855F7' : '#94A3B8'} />
+              <Text style={[styles.tabLabel, { color: currentTab === 'live' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'live' ? '700' : '400' }]}>
+                Live Focus
+              </Text>
+              {currentTab === 'live' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setCurrentTab('notifications');
+                showToast('Navigating to Filtered Notifications Panel...');
+              }}
+              style={styles.tabItem}>
+              <View>
+                <Bell size={20} color={currentTab === 'notifications' ? '#A855F7' : '#94A3B8'} />
+                {queueCount > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{queueCount}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.tabLabel, { color: currentTab === 'notifications' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'notifications' ? '700' : '400' }]}>
+                Queue
+              </Text>
+              {currentTab === 'notifications' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setCurrentTab('analytics');
+                showToast('Opening Performance Analytics charts...');
+              }}
+              style={styles.tabItem}>
+              <BarChart2 size={20} color={currentTab === 'analytics' ? '#A855F7' : '#94A3B8'} />
+              <Text style={[styles.tabLabel, { color: currentTab === 'analytics' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'analytics' ? '700' : '400' }]}>
+                Analytics
+              </Text>
+              {currentTab === 'analytics' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setCurrentTab('profile');
+                showToast('Opening User Identity Profiles Settings...');
+              }}
+              style={styles.tabItem}>
+              <Sliders size={20} color={currentTab === 'profile' ? '#A855F7' : '#94A3B8'} />
+              <Text style={[styles.tabLabel, { color: currentTab === 'profile' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'profile' ? '700' : '400' }]}>
+                Settings
+              </Text>
+              {currentTab === 'profile' && <View style={styles.activeTabIndicator} />}
+            </TouchableOpacity>
+
+          </View>
+        </BlurFallbackContainer>
+      </View>
+
+    </LinearGradient>
+  );
+}
+
+// Fallback container to support semi-transparent overlay mimicking glassmorphism
+function BlurFallbackContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={styles.blurFallback}>
+      {children}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
   },
-  heroSection: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 35 : 15,
+    paddingBottom: 15,
+  },
+  greetingText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: -0.5,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  dateDivider: {
+    color: '#334155',
+    marginHorizontal: 8,
+    fontSize: 12,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatarBorder: {
+    padding: 2,
+    borderRadius: 25,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1E1B4B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#000',
+  },
+  statusDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#0B0C10',
+  },
+  monitoringBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    marginBottom: 10,
+  },
+  monitoringIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  indicatorLight: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  monitoringText: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  syncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.25)',
+  },
+  syncText: {
+    color: '#D8B4FE',
+    fontSize: 11,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 130,
+    left: 20,
+    right: 20,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    zIndex: 9999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  toastText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 150, // Space for floating bottom navigation
+  },
+  glassCard: {
+    backgroundColor: 'rgba(20, 22, 38, 0.65)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  glassCardNoPadding: {
+    backgroundColor: 'rgba(20, 22, 38, 0.65)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: -0.2,
+  },
+  gaugeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 15,
+    position: 'relative',
+  },
+  gaugeCenterText: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+  gaugeScore: {
+    fontSize: 46,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -1,
+  },
+  gaugeState: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: -2,
+    letterSpacing: 1.5,
+  },
+  gaugeFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    paddingTop: 12,
+    marginTop: 5,
+  },
+  gaugeFooterText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  waveHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 20,
+  },
+  waveTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  waveSubtitle: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  waveContainer: {
+    height: 100,
+    position: 'relative',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    justifyContent: 'flex-end',
+  },
+  waveOffsetWrapper: {
+    width: 800,
+    height: 100,
+    position: 'absolute',
+    bottom: 0,
+  },
+  waveVector: {
+    position: 'absolute',
+    bottom: 0,
+    width: 800,
+    height: 100,
+  },
+  waveOverlay: {
+    position: 'absolute',
+    left: 20,
+    bottom: 12,
+    zIndex: 10,
+  },
+  waveStateValue: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  waveStateLabel: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  velocityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  velocityDesc: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  badgeContainer: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+  },
+  badgeText: {
+    color: '#D8B4FE',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  progressItem: {
+    marginBottom: 14,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  progressLabel: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  progressValue: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  aiInsightCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 70, 239, 0.2)',
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#D946EF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  aiTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  aiMetricsRow: {
+    flexDirection: 'row',
+    marginTop: 15,
+  },
+  aiMetricCell: {
+    flex: 1,
+  },
+  aiMetricLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  aiMetricVal: {
+    color: '#3B82F6',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  aiMetricValPink: {
+    color: '#D946EF',
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  aiDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: 14,
+  },
+  aiRecommendationTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D946EF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  aiRecommendationText: {
+    fontSize: 13,
+    color: '#E2E8F0',
+    lineHeight: 20,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  sectionHeading: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 14,
+    marginTop: 6,
+    letterSpacing: -0.3,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryGridCard: {
+    width: '48%',
+    backgroundColor: 'rgba(20, 22, 38, 0.65)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    padding: 16,
+    marginBottom: 16,
+    justifyContent: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  gridCardValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFF',
+    marginTop: 4,
+  },
+  gridCardLargeValue: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#10B981',
+  },
+  gridCardLabel: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  productivityStatus: {
+    fontSize: 11,
+    color: '#10B981',
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  actionButton: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    shadowColor: '#FFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  actionActive: {
+    backgroundColor: '#EF4444',
+    borderColor: '#F87171',
+  },
+  actionActivePurple: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#A78BFA',
+  },
+  actionInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  actionBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusList: {
+    marginTop: 12,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  statusLabel: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  statusStateOk: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  statusStateInfo: {
+    color: '#3B82F6',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  statusStateWarning: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  statusIndicatorPulse: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginLeft: 8,
+  },
+  timelineContainer: {
+    marginTop: 10,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  timelineLeft: {
+    flexDirection: 'row',
+    width: 75,
+  },
+  timelineTime: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    width: 42,
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  timelineLineWrapper: {
+    alignItems: 'center',
+    width: 33,
+  },
+  timelineNode: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 6,
+    zIndex: 2,
+    borderWidth: 2,
+    borderColor: '#0F0E23',
+  },
+  nodeSuccess: {
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowRadius: 4,
+    shadowOpacity: 0.8,
+  },
+  nodeWarning: {
+    backgroundColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowRadius: 4,
+    shadowOpacity: 0.8,
+  },
+  nodeBlock: {
+    backgroundColor: '#EF4444',
+    shadowColor: '#EF4444',
+    shadowRadius: 4,
+    shadowOpacity: 0.8,
+  },
+  timelineLine: {
+    width: 2,
+    position: 'absolute',
+    top: 16,
+    bottom: -20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 1,
+  },
+  timelineRight: {
+    flex: 1,
+    paddingLeft: 4,
+  },
+  timelineTitleText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  timelineDescText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  footerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  footerText: {
+    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  bottomTabContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  blurFallback: {
+    backgroundColor: 'rgba(15, 17, 30, 0.85)',
+  },
+  bottomTabInner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    position: 'relative',
+    paddingVertical: 4,
   },
-  title: {
-    textAlign: 'center',
+  tabLabel: {
+    fontSize: 9,
+    marginTop: 4,
   },
-  code: {
-    textTransform: 'uppercase',
+  tabBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    backgroundColor: '#EC4899',
+    borderRadius: 8,
+    minWidth: 15,
+    height: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  tabBadgeText: {
+    color: '#FFF',
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  activeTabIndicator: {
+    width: 14,
+    height: 3,
+    backgroundColor: '#A855F7',
+    borderRadius: 1.5,
+    position: 'absolute',
+    bottom: -6,
+    shadowColor: '#A855F7',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 5,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
