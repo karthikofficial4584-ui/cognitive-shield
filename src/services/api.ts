@@ -183,3 +183,38 @@ export const analyticsService = {
     return { range, timestamp: Date.now() };
   },
 };
+
+export const digestService = {
+  generateDigest: async () => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.post('/digest/generate');
+      return response.data;
+    }
+    // Mock POST /digest/generate
+    return {
+      id: `digest-${Date.now()}`,
+      user_id: 'mock-user',
+      summary: 'You received 5 notifications while in Deep Focus.\n\n• Slack — 2 messages\n• Teams — 1 message\n• Email — 1 message\n• PagerDuty — 1 message\n\nMost important:\nSystem: Production Server Down',
+      notification_count: 5,
+      highest_urgency: 0.95,
+      time_saved_minutes: 10,
+      app_grouping: { Slack: 2, Teams: 1, Email: 1, PagerDuty: 1 },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  },
+  getLatest: async () => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.get('/digest/latest');
+      return response.data;
+    }
+    return null;
+  },
+  getHistory: async (limit = 20) => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.get(`/digest/history?limit=${limit}`);
+      return response.data;
+    }
+    return [];
+  },
+};

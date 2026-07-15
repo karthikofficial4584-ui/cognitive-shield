@@ -7,7 +7,7 @@ import {
   TabListProps,
 } from 'expo-router/ui';
 import { Pressable, useColorScheme, View, StyleSheet, useWindowDimensions } from 'react-native';
-import { Home as HomeIcon, Activity, Bell, Layers, BarChart2, User, ExternalLink as LinkIcon } from 'lucide-react-native';
+import { Home as HomeIcon, Activity, Bell, Layers, BarChart2, User, ExternalLink as LinkIcon, Sparkles } from 'lucide-react-native';
 
 import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
@@ -35,6 +35,9 @@ export default function AppTabs() {
           <TabTrigger name="queue" href={"/queue" as any} asChild>
             <TabButton isSidebar={isSidebar}>Queue</TabButton>
           </TabTrigger>
+          <TabTrigger name="digest" href={"/digest" as any} asChild>
+            <TabButton isSidebar={isSidebar}>Digest</TabButton>
+          </TabTrigger>
           <TabTrigger name="analytics" href={"/analytics" as any} asChild>
             <TabButton isSidebar={isSidebar}>Analytics</TabButton>
           </TabTrigger>
@@ -55,6 +58,7 @@ function getIconForTab(name: string, color: string) {
     case 'Live Focus': return <Activity size={size} color={color} />;
     case 'Notifications': return <Bell size={size} color={color} />;
     case 'Queue': return <Layers size={size} color={color} />;
+    case 'Digest': return <Sparkles size={size} color={color} />;
     case 'Analytics': return <BarChart2 size={size} color={color} />;
     case 'Profile': return <User size={size} color={color} />;
     default: return null;
