@@ -23,8 +23,6 @@ import Animated, {
   Easing,
   useDerivedValue,
 } from 'react-native-reanimated';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import {
   Shield,
   Activity,
@@ -56,43 +54,12 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Create a query client for React Query
-const queryClient = new QueryClient();
-
 // Animated components for Reanimated SVG animations
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// Axios mock client
-const mockClient = axios.create({
-  baseURL: 'https://api.cognitiveshield.mock',
-});
-
-// Mock service layer
-const fetchDashboardData = async () => {
-  // Simulate API fetch delay
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  return {
-    focusScore: 85,
-    focusState: 'Deep Focus',
-    typingSpeed: 78,
-    codeChanges: 142,
-    windowActivity: 3,
-    velocityScore: 84,
-    deepFocusTime: '4h 12m',
-    notificationsBlocked: 42,
-    criticalAlerts: 3,
-    queuedNotifications: 12,
-    productivityScore: 92,
-  };
-};
-
 export default function HomeScreen() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <DashboardScreen />
-    </QueryClientProvider>
-  );
+  return <DashboardScreen />;
 }
 
 import { useShield } from '@/context/ShieldContext';
@@ -116,7 +83,6 @@ function DashboardScreen() {
     isLoading,
   } = useShield();
 
-  const [currentTab, setCurrentTab] = useState<'home' | 'live' | 'notifications' | 'analytics' | 'profile'>('home');
   const [isFocusMode, setIsFocusMode] = useState(false);
 
   const focusState = focusScore >= 85 ? 'Deep Focus' : focusScore >= 75 ? 'Focused' : focusScore >= 50 ? 'Normal' : focusScore >= 30 ? 'Distracted' : 'Idle';
@@ -724,95 +690,7 @@ function DashboardScreen() {
 
         </ScrollView>
       </SafeAreaView>
-
-      {/* FLOATING GLASSMORPHIC BOTTOM TAB NAVIGATION */}
-      <View style={styles.bottomTabContainer}>
-        <BlurFallbackContainer>
-          <View style={styles.bottomTabInner}>
-            
-            <TouchableOpacity
-              onPress={() => setCurrentTab('home')}
-              style={styles.tabItem}>
-              <Home size={20} color={currentTab === 'home' ? '#A855F7' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, { color: currentTab === 'home' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'home' ? '700' : '400' }]}>
-                Home
-              </Text>
-              {currentTab === 'home' && <View style={styles.activeTabIndicator} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                setCurrentTab('live');
-                showToast('Switching to Live telemetry workspace...');
-              }}
-              style={styles.tabItem}>
-              <Activity size={20} color={currentTab === 'live' ? '#A855F7' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, { color: currentTab === 'live' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'live' ? '700' : '400' }]}>
-                Live Focus
-              </Text>
-              {currentTab === 'live' && <View style={styles.activeTabIndicator} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                setCurrentTab('notifications');
-                showToast('Navigating to Filtered Notifications Panel...');
-              }}
-              style={styles.tabItem}>
-              <View>
-                <Bell size={20} color={currentTab === 'notifications' ? '#A855F7' : '#94A3B8'} />
-                {queueCount > 0 && (
-                  <View style={styles.tabBadge}>
-                    <Text style={styles.tabBadgeText}>{queueCount}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={[styles.tabLabel, { color: currentTab === 'notifications' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'notifications' ? '700' : '400' }]}>
-                Queue
-              </Text>
-              {currentTab === 'notifications' && <View style={styles.activeTabIndicator} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                setCurrentTab('analytics');
-                showToast('Opening Performance Analytics charts...');
-              }}
-              style={styles.tabItem}>
-              <BarChart2 size={20} color={currentTab === 'analytics' ? '#A855F7' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, { color: currentTab === 'analytics' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'analytics' ? '700' : '400' }]}>
-                Analytics
-              </Text>
-              {currentTab === 'analytics' && <View style={styles.activeTabIndicator} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                setCurrentTab('profile');
-                showToast('Opening User Identity Profiles Settings...');
-              }}
-              style={styles.tabItem}>
-              <Sliders size={20} color={currentTab === 'profile' ? '#A855F7' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, { color: currentTab === 'profile' ? '#FFF' : '#94A3B8', fontWeight: currentTab === 'profile' ? '700' : '400' }]}>
-                Settings
-              </Text>
-              {currentTab === 'profile' && <View style={styles.activeTabIndicator} />}
-            </TouchableOpacity>
-
-          </View>
-        </BlurFallbackContainer>
-      </View>
-
     </LinearGradient>
-  );
-}
-
-// Fallback container to support semi-transparent overlay mimicking glassmorphism
-function BlurFallbackContainer({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={styles.blurFallback}>
-      {children}
-    </View>
   );
 }
 

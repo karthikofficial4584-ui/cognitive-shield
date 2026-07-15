@@ -23,8 +23,6 @@ import Animated, {
   FadeIn,
   FadeInUp,
 } from 'react-native-reanimated';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import {
   Shield,
   Activity,
@@ -63,33 +61,11 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Local Query Client
-const queryClient = new QueryClient();
-
 // Reanimated custom components
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// Axios mock setup
-const api = axios.create({
-  baseURL: 'https://api.cognitiveshield.mock',
-});
-
-const fetchProfileConfig = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    streak: 12,
-    todayDeepWork: '4h 12m',
-    todayProd: 92,
-    memberSince: 'Jul 2026',
-  };
-};
-
 export default function ProfileRoute() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ProfileSettingsScreen />
-    </QueryClientProvider>
-  );
+  return <ProfileSettingsScreen />;
 }
 
 // Switch Component
@@ -151,34 +127,44 @@ const switchStyles = StyleSheet.create({
 import { useShield } from '@/context/ShieldContext';
 
 function ProfileSettingsScreen() {
-  const { analytics, isOffline, toggleOfflineMode } = useShield();
+  const {
+    analytics,
+    isOffline,
+    toggleOfflineMode,
+    focusThreshold,
+    setFocusThreshold,
+    urgencyThreshold,
+    setUrgencyThreshold,
+    enableNotif,
+    setEnableNotif,
+    criticalAlerts,
+    setCriticalAlerts,
+    soundEnabled,
+    setSoundEnabled,
+    vibrationEnabled,
+    setVibrationEnabled,
+    queueAutoRelease,
+    setQueueAutoRelease,
+    darkMode,
+    setDarkMode,
+    accentColor,
+    setAccentColor,
+    animationsEnabled,
+    setAnimationsEnabled,
+    fontSize,
+    setFontSize,
+    dataCollection,
+    setDataCollection,
+    telemetryPermission,
+    setTelemetryPermission,
+    analyticsSharing,
+    setAnalyticsSharing,
+  } = useShield();
 
   const memberSince = 'Jul 2026';
   const streakCount = 12;
   const deepWorkHours = Math.floor(analytics.deepFocusMinutes / 60) + 'h ' + (analytics.deepFocusMinutes % 60) + 'm';
   const productivityScore = analytics.productivityScore;
-
-  // 1. Settings Local States
-  const [focusThreshold, setFocusThreshold] = useState(75);
-  const [urgencyThreshold, setUrgencyThreshold] = useState(0.85);
-
-  // Notifications
-  const [enableNotif, setEnableNotif] = useState(true);
-  const [criticalAlerts, setCriticalAlerts] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [queueAutoRelease, setQueueAutoRelease] = useState(true);
-
-  // Appearance
-  const [darkMode, setDarkMode] = useState(true);
-  const [accentColor, setAccentColor] = useState<'Purple' | 'Blue' | 'Emerald' | 'Rose'>('Purple');
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
-  const [fontSize, setFontSize] = useState<'Small' | 'Medium' | 'Large'>('Medium');
-
-  // Privacy
-  const [dataCollection, setDataCollection] = useState(true);
-  const [telemetryPermission, setTelemetryPermission] = useState(true);
-  const [analyticsSharing, setAnalyticsSharing] = useState(false);
 
   // Achievements Unlocked Dialog State
   const [activeAchievement, setActiveAchievement] = useState<{ title: string; desc: string; icon: string } | null>(null);

@@ -26,8 +26,6 @@ import Animated, {
   FadeInUp,
   FadeOutRight,
 } from 'react-native-reanimated';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import {
   Shield,
   Activity,
@@ -64,32 +62,12 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Local Query Client
-const queryClient = new QueryClient();
-
 // Reanimated custom components
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// Axios mock setup
-const api = axios.create({
-  baseURL: 'https://api.cognitiveshield.mock',
-});
-
-const fetchQueueConfig = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    releaseThreshold: 75,
-    autoFlushMinutes: 15,
-  };
-};
-
 export default function QueueRoute() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <QueueManagerScreen />
-    </QueryClientProvider>
-  );
+  return <QueueManagerScreen />;
 }
 
 // Queued item structure

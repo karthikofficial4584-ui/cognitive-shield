@@ -21,8 +21,6 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import {
   Shield,
   Activity,
@@ -57,36 +55,12 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Create local Query Client
-const queryClient = new QueryClient();
-
 // Reanimated custom components
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// Axios setup
-const api = axios.create({
-  baseURL: 'https://api.cognitiveshield.mock',
-});
-
-// Mock query function for future API
-const fetchLiveTelemetryConfig = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    lambda: 0.15,
-    deltaT: 1.0,
-    kWeight: 0.3,
-    cWeight: 0.5,
-    aWeight: 0.2,
-  };
-};
-
 export default function ExploreScreen() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <LiveFocusScreen />
-    </QueryClientProvider>
-  );
+  return <LiveFocusScreen />;
 }
 
 interface NotificationItem {
@@ -113,6 +87,7 @@ function LiveFocusScreen() {
     demoModeActive: isSimulating,
     startDemoSimulation,
     stopDemoSimulation,
+    focusHistory,
   } = useShield();
 
   // Math parameters
@@ -127,16 +102,6 @@ function LiveFocusScreen() {
   const kNorm = parseFloat((typingSpeed / 100).toFixed(2));
   const cNorm = parseFloat(Math.min(codeChanges / 250, 1.0).toFixed(2));
   const aNorm = parseFloat((windowConsistency / 100).toFixed(2));
-
-  // Score History (15 seconds of logs)
-  const [history, setHistory] = useState<number[]>([76, 78, 77, 80, 81, 79, 82, 83, 80, 82, 84, 85, 83, 81, 82]);
-
-  useEffect(() => {
-    setHistory(prev => {
-      const nextHistory = [...prev.slice(1), focusScore];
-      return nextHistory;
-    });
-  }, [focusScore]);
 
   // Sync timeline with block events
   const timeline = useMemo(() => {
@@ -260,9 +225,9 @@ function LiveFocusScreen() {
   const graphHeight = 110;
   
   const pathData = useMemo(() => {
-    if (history.length === 0) return '';
-    const points = history.map((score, index) => {
-      const x = (index / (history.length - 1)) * graphWidth;
+    if (focusHistory.length === 0) return '';
+    const points = focusHistory.map((score, index) => {
+      const x = (index / (focusHistory.length - 1)) * graphWidth;
       // Invert Y coordinate since SVG 0 is top
       const y = graphHeight - (score / 100) * graphHeight;
       return { x, y };
@@ -280,7 +245,7 @@ function LiveFocusScreen() {
       d += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
     }
     return d;
-  }, [history, graphWidth]);
+  }, [focusHistory, graphWidth]);
 
   // Gradient fill path data
   const areaPathData = useMemo(() => {
@@ -460,10 +425,10 @@ function LiveFocusScreen() {
                   {pathData ? <Path d={pathData} fill="none" stroke="url(#lineGrad)" strokeWidth="3" /> : null}
 
                   {/* Glowing last point dot */}
-                  {history.length > 0 && (
+                  {focusHistory.length > 0 && (
                     <Circle
                       cx={graphWidth}
-                      cy={graphHeight - (history[history.length - 1] / 100) * graphHeight}
+                      cy={graphHeight - (focusHistory[focusHistory.length - 1] / 100) * graphHeight}
                       r="4"
                       fill="#FFF"
                     />
@@ -475,7 +440,7 @@ function LiveFocusScreen() {
 
             <View style={styles.chartLegendRow}>
               <Text style={styles.legendText}>15 SEC ATTENTION VECTOR SHIFT</Text>
-              <Text style={styles.legendValue}>Avg: {Math.round(history.reduce((a,b)=>a+b,0)/history.length)}%</Text>
+              <Text style={styles.legendValue}>Avg: {Math.round(focusHistory.reduce((a,b)=>a+b,0)/focusHistory.length)}%</Text>
             </View>
 
           </View>

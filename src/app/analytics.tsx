@@ -25,8 +25,6 @@ import Animated, {
   FadeIn,
   FadeInUp,
 } from 'react-native-reanimated';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import {
   Shield,
   Activity,
@@ -57,97 +55,12 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Local Query Client
-const queryClient = new QueryClient();
-
 // Reanimated custom components
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// Axios mock setup
-const api = axios.create({
-  baseURL: 'https://api.cognitiveshield.mock',
-});
-
-// Mock analytics data fetch
-const fetchAnalyticsReport = async (range: string) => {
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  // Return different stats based on range
-  if (range === 'Today') {
-    return {
-      productivityScore: 92,
-      focusTrend: '+8% vs yesterday',
-      deepFocusMinutes: 252, // 4h 12m
-      preventedInteractions: 42,
-      savedMinutes: 180,
-      focusEfficiency: 94,
-      allowedNotif: 8,
-      blockedNotif: 34,
-      criticalAlerts: 2,
-      queuedNotif: 12,
-      releasedNotif: 10,
-      avgQueueTime: 14, // minutes
-      avgVelocity: 84, // VS
-      typingTrend: '+12% WPM',
-      codeChangesTrend: '+142 lines',
-      consistencyIndex: 91, // %
-      attentionStability: 96, // %
-      switchesPrevented: 42,
-      weeklyImprovement: 8.5,
-    };
-  }
-  if (range === 'This Week') {
-    return {
-      productivityScore: 88,
-      focusTrend: '+12% vs last week',
-      deepFocusMinutes: 1320, // 22h
-      preventedInteractions: 245,
-      savedMinutes: 980,
-      focusEfficiency: 89,
-      allowedNotif: 58,
-      blockedNotif: 187,
-      criticalAlerts: 14,
-      queuedNotif: 62,
-      releasedNotif: 48,
-      avgQueueTime: 18,
-      avgVelocity: 79,
-      typingTrend: '+6% WPM',
-      codeChangesTrend: '+1,240 lines',
-      consistencyIndex: 87,
-      attentionStability: 92,
-      switchesPrevented: 245,
-      weeklyImprovement: 12.0,
-    };
-  }
-  return { // Monthly/All Time
-    productivityScore: 84,
-    focusTrend: '+4% vs last month',
-    deepFocusMinutes: 5240, // 87.3h
-    preventedInteractions: 984,
-    savedMinutes: 3936,
-    focusEfficiency: 86,
-    allowedNotif: 210,
-    blockedNotif: 720,
-    criticalAlerts: 48,
-    queuedNotif: 284,
-    releasedNotif: 215,
-    avgQueueTime: 22,
-    avgVelocity: 76,
-    typingTrend: '+4% WPM',
-    codeChangesTrend: '+4,890 lines',
-    consistencyIndex: 82,
-    attentionStability: 89,
-    switchesPrevented: 984,
-    weeklyImprovement: 4.8,
-  };
-};
-
 export default function AnalyticsRoute() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AnalyticsDashboard />
-    </QueryClientProvider>
-  );
+  return <AnalyticsDashboard />;
 }
 
 // Reusable CountUp component using RequestAnimationFrame for smooth cross-platform 60 FPS transitions
@@ -191,9 +104,132 @@ function CountUpText({ value, suffix = '', prefix = '', duration = 800, style }:
 
 import { useShield } from '@/context/ShieldContext';
 
+interface FocusTrendChartProps {
+  graphWidth: number;
+  graphHeight: number;
+  areaPathData: string;
+  pathData: string;
+  focusScores: number[];
+  xLabel: string[];
+}
+
+const FocusTrendChart = React.memo(function FocusTrendChart({
+  graphWidth,
+  graphHeight,
+  areaPathData,
+  pathData,
+  focusScores,
+  xLabel,
+}: FocusTrendChartProps) {
+  return (
+    <View style={styles.chartContainer}>
+      <Svg width={graphWidth} height={graphHeight}>
+        <Defs>
+          <SvgGradient id="curveAreaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.25" />
+            <Stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
+          </SvgGradient>
+          <SvgGradient id="curveLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%" stopColor="#8B5CF6" />
+            <Stop offset="100%" stopColor="#3B82F6" />
+          </SvgGradient>
+        </Defs>
+
+        {/* Grid guidelines */}
+        <Line x1="0" y1={graphHeight * 0.25} x2={graphWidth} y2={graphHeight * 0.25} stroke="rgba(255,255,255,0.02)" />
+        <Line x1="0" y1={graphHeight * 0.5} x2={graphWidth} y2={graphHeight * 0.5} stroke="rgba(255,255,255,0.02)" />
+        <Line x1="0" y1={graphHeight * 0.75} x2={graphWidth} y2={graphHeight * 0.75} stroke="rgba(255,255,255,0.02)" />
+
+        {/* Graph Fill Area */}
+        {areaPathData ? <Path d={areaPathData} fill="url(#curveAreaGrad)" /> : null}
+
+        {/* Line Curve Path */}
+        {pathData ? <Path d={pathData} fill="none" stroke="url(#curveLineGrad)" strokeWidth="3" /> : null}
+
+        {/* Vertices dot circles */}
+        {focusScores.map((score: number, index: number) => {
+          const x = (index / (focusScores.length - 1)) * graphWidth;
+          const y = graphHeight - (score / 100) * graphHeight;
+          return (
+            <Circle
+              key={index}
+              cx={x}
+              cy={y}
+              r="3.5"
+              fill="#FFF"
+              stroke="#8B5CF6"
+              strokeWidth="1.5"
+            />
+          );
+        })}
+      </Svg>
+    </View>
+  );
+});
+
+interface FocusHeatmapProps {
+  heatmapRows: string[];
+  heatmapCols: string[];
+  heatmapData: number[][];
+}
+
+const FocusHeatmap = React.memo(function FocusHeatmap({
+  heatmapRows,
+  heatmapCols,
+  heatmapData,
+}: FocusHeatmapProps) {
+  const getHeatmapColor = (level: number) => {
+    switch (level) {
+      case 4: return '#A855F7';
+      case 3: return '#6366F1';
+      case 2: return '#3B82F6';
+      case 1: return '#06B6D4';
+      default: return 'rgba(255,255,255,0.03)';
+    }
+  };
+
+  return (
+    <View style={styles.heatmapWrapper}>
+      {/* Columns Header (Hours) */}
+      <View style={styles.heatmapHoursHeader}>
+        <View style={{ width: 35 }} />
+        {heatmapCols.map((col, idx) => (
+          <Text key={idx} style={styles.heatmapHeaderColText}>{col}</Text>
+        ))}
+      </View>
+
+      {/* Rows Grid */}
+      {heatmapRows.map((rowLabel, rowIndex) => (
+        <View key={rowIndex} style={styles.heatmapRow}>
+          <Text style={styles.heatmapRowText}>{rowLabel}</Text>
+          
+          {heatmapData[rowIndex].map((level, colIndex) => {
+            const color = getHeatmapColor(level);
+            return (
+              <View
+                key={colIndex}
+                style={[styles.heatmapCell, { backgroundColor: color }]}
+              />
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+});
+
 function AnalyticsDashboard() {
   const [dateRange, setDateRange] = useState<'Today' | 'This Week' | 'This Month'>('Today');
   const { analytics: liveAnalytics, isLoading: isFetching } = useShield();
+  const [chartsVisible, setChartsVisible] = useState(false);
+
+  useEffect(() => {
+    // Delay rendering of heavy charts to avoid transition stutters
+    const timer = setTimeout(() => {
+      setChartsVisible(true);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, []);
 
   const report = useMemo(() => {
     if (dateRange === 'Today') {
@@ -431,48 +467,20 @@ function AnalyticsDashboard() {
             </Text>
 
             {/* SVG Line Graph */}
-            <View style={styles.chartContainer}>
-              <Svg width={graphWidth} height={graphHeight}>
-                <Defs>
-                  <SvgGradient id="curveAreaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.25" />
-                    <Stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
-                  </SvgGradient>
-                  <SvgGradient id="curveLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <Stop offset="0%" stopColor="#8B5CF6" />
-                    <Stop offset="100%" stopColor="#3B82F6" />
-                  </SvgGradient>
-                </Defs>
-
-                {/* Grid guidelines */}
-                <Line x1="0" y1={graphHeight * 0.25} x2={graphWidth} y2={graphHeight * 0.25} stroke="rgba(255,255,255,0.02)" />
-                <Line x1="0" y1={graphHeight * 0.5} x2={graphWidth} y2={graphHeight * 0.5} stroke="rgba(255,255,255,0.02)" />
-                <Line x1="0" y1={graphHeight * 0.75} x2={graphWidth} y2={graphHeight * 0.75} stroke="rgba(255,255,255,0.02)" />
-
-                {/* Graph Fill Area */}
-                {areaPathData ? <Path d={areaPathData} fill="url(#curveAreaGrad)" /> : null}
-
-                {/* Line Curve Path */}
-                {pathData ? <Path d={pathData} fill="none" stroke="url(#curveLineGrad)" strokeWidth="3" /> : null}
-
-                {/* Vertices dot circles */}
-                {focusScores.map((score: number, index: number) => {
-                  const x = (index / (focusScores.length - 1)) * graphWidth;
-                  const y = graphHeight - (score / 100) * graphHeight;
-                  return (
-                    <Circle
-                      key={index}
-                      cx={x}
-                      cy={y}
-                      r="3.5"
-                      fill="#FFF"
-                      stroke="#8B5CF6"
-                      strokeWidth="1.5"
-                    />
-                  );
-                })}
-              </Svg>
-            </View>
+            {chartsVisible ? (
+              <FocusTrendChart
+                graphWidth={graphWidth}
+                graphHeight={graphHeight}
+                areaPathData={areaPathData}
+                pathData={pathData}
+                focusScores={focusScores}
+                xLabel={xLabel}
+              />
+            ) : (
+              <View style={[styles.chartContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="small" color="#8B5CF6" />
+              </View>
+            )}
 
             {/* X Labels grid */}
             <View style={styles.chartXLabelsRow}>
@@ -493,34 +501,17 @@ function AnalyticsDashboard() {
             </Text>
 
             {/* Heatmap Layout */}
-            <View style={styles.heatmapWrapper}>
-              
-              {/* Columns Header (Hours) */}
-              <View style={styles.heatmapHoursHeader}>
-                <View style={{ width: 35 }} /> {/* row label placeholder spacing */}
-                {heatmapCols.map((col, idx) => (
-                  <Text key={idx} style={styles.heatmapHeaderColText}>{col}</Text>
-                ))}
+            {chartsVisible ? (
+              <FocusHeatmap
+                heatmapRows={heatmapRows}
+                heatmapCols={heatmapCols}
+                heatmapData={heatmapData}
+              />
+            ) : (
+              <View style={[styles.heatmapWrapper, { height: 130, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="small" color="#06B6D4" />
               </View>
-
-              {/* Rows Grid */}
-              {heatmapRows.map((rowLabel, rowIndex) => (
-                <View key={rowIndex} style={styles.heatmapRow}>
-                  <Text style={styles.heatmapRowText}>{rowLabel}</Text>
-                  
-                  {heatmapData[rowIndex].map((level, colIndex) => {
-                    const color = getHeatmapColor(level);
-                    return (
-                      <View
-                        key={colIndex}
-                        style={[styles.heatmapCell, { backgroundColor: color }]}
-                      />
-                    );
-                  })}
-                </View>
-              ))}
-
-            </View>
+            )}
 
             {/* Legend block indicators */}
             <View style={styles.heatmapLegendRow}>

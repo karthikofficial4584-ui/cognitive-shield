@@ -25,8 +25,6 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import {
   Shield,
   Activity,
@@ -60,34 +58,15 @@ import {
 
 const { width } = Dimensions.get('window');
 
-// Local Query Client
-const queryClient = new QueryClient();
-
 // Reanimated components
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// Axios mock
-const api = axios.create({
-  baseURL: 'https://api.cognitiveshield.mock',
-});
-
-const fetchNotificationsConfig = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    urgencyThreshold: 0.5,
-    criticalThreshold: 0.85,
-    focusThresholdFactor: 0.65,
-  };
-};
-
 export default function NotificationsRoute() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <NotificationCenterScreen />
-      </GestureHandlerRootView>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NotificationCenterScreen />
+    </GestureHandlerRootView>
   );
 }
 
