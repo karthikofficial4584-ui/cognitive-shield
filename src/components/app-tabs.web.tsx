@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     // Glassmorphism effect for web
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-  },
+  } as any,
   innerContainer: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,

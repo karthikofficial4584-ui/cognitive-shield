@@ -52,6 +52,7 @@ apiClient.interceptors.response.use(
       // Gracefully redirect to login on 401 without crashing
       router.replace('/login' as any);
     }
+    
     if (error.config && error.config.skipErrorLog) {
       // Suppress logging to console for expected client errors (e.g. 404 on getLatestDigest)
     } else if (error.response && error.response.data && error.response.data.detail) {
@@ -350,15 +351,19 @@ export const digestService = {
   getLatest: async () => {
     if (!hasToken()) return null;
     if (shouldHitBackend()) {
-      try {
-        const response = await apiClient.get('/digest/latest', { skipErrorLog: true } as any);
-        return response.data;
-      } catch (error: any) {
-        if (error.response && error.response.status === 404) {
-          return null; // Gracefully return null empty state if no digest generated yet
+      const response = await apiClient.get('/digest/latest', {
+        validateStatus: (status: number) => (status >= 200 && status < 300) || status === 404,
+        skipErrorLog: true,
+      } as any);
+
+      if (response.status === 404) {
+        if (response.data && response.data.detail === 'No digests generated yet.') {
+          return null; // Gracefully return null empty state
         }
-        throw error;
+        throw new Error(response.data?.detail || 'Not Found');
       }
+
+      return response.data;
     }
     return null;
   },

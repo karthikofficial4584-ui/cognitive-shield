@@ -10,6 +10,7 @@ import {
   StatusBar,
   SafeAreaView,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
@@ -58,6 +59,8 @@ import {
   FileCode,
   Volume2,
   GitPullRequest,
+  Search,
+  Filter,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -108,6 +111,19 @@ function QueueManagerScreen() {
 
   // 1. Core States
   const [selectedItemId, setSelectedItemId] = useState<string>('1');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Local filtering
+  const filteredQueue = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return queue;
+    return queue.filter(item => {
+      const appMatch = item.app?.toLowerCase().includes(query);
+      const senderMatch = item.sender?.toLowerCase().includes(query);
+      const titleMatch = item.title?.toLowerCase().includes(query);
+      return appMatch || senderMatch || titleMatch;
+    });
+  }, [queue, searchQuery]);
 
   // Stats derived state
   const stats = useMemo(() => {
@@ -121,8 +137,8 @@ function QueueManagerScreen() {
   }, [queue, analytics]);
 
   const selectedItem = useMemo(() => {
-    return queue.find(item => item.id === selectedItemId) || queue[0];
-  }, [queue, selectedItemId]);
+    return filteredQueue.find(item => item.id === selectedItemId) || filteredQueue[0];
+  }, [filteredQueue, selectedItemId]);
 
   // Success checklist trigger (all items released)
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
@@ -448,9 +464,41 @@ function QueueManagerScreen() {
             </Text>
           </LinearGradient>
 
+          {/* SEARCH BAR */}
+          {queue.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.06)',
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                height: 44,
+              }}>
+                <Search size={16} color="#64748B" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={{
+                    flex: 1,
+                    color: '#FFF',
+                    fontSize: 14,
+                    outlineStyle: 'none',
+                  } as any}
+                  placeholder="Search queue notifications..."
+                  placeholderTextColor="#64748B"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+          )}
+
           {/* VISUAL VERTICAL QUEUE */}
           <View style={styles.listHeaderRow}>
-            <Text style={styles.sectionHeading}>Buffered Queue List ({queue.length})</Text>
+            <Text style={styles.sectionHeading}>Buffered Queue List ({filteredQueue.length})</Text>
             <Text style={styles.sectionSub}>Tapping a card displays lifetime timeline status below</Text>
           </View>
 
@@ -469,9 +517,14 @@ function QueueManagerScreen() {
               <Layers size={24} color="#64748B" style={{ marginBottom: 8 }} />
               <Text style={styles.emptyText}>Attention queue is empty. Shield is monitoring workspace.</Text>
             </View>
+          ) : filteredQueue.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Layers size={24} color="#64748B" style={{ marginBottom: 8 }} />
+              <Text style={styles.emptyText}>No matching notifications found in queue.</Text>
+            </View>
           ) : (
             <View style={styles.queueCardList}>
-              {queue.map((item) => (
+              {filteredQueue.map((item) => (
                 <AnimatedView
                   key={item.id}
                   entering={FadeInUp.duration(400)}

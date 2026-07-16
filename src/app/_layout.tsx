@@ -120,7 +120,7 @@ function NavigationGate() {
     );
   }
 
-  const inAuthGroup = segments[0] === 'login' || segments[0] === 'register' || segments.includes('login') || segments.includes('register');
+  const inAuthGroup = segments[0] === 'login' || segments[0] === 'register' || (segments as string[]).includes('login') || (segments as string[]).includes('register');
 
   if (!isAuthenticated && !inAuthGroup) {
     // Completely unmounts the protected tree (RootApp) and performs the redirect safely.

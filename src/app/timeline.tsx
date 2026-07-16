@@ -59,6 +59,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { timelineService } from '@/services/api';
 import { useShield } from '@/context/ShieldContext';
 import { useAuth } from '@/context/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const { width } = Dimensions.get('window');
 
@@ -200,10 +201,13 @@ export default function TimelineRoute() {
   // Client side Search filter logic
   const filteredEvents = useMemo(() => {
     if (!data) return [];
+    const query = searchQuery.toLowerCase().trim();
     return data.filter(event => {
-      const titleMatch = event.title?.toLowerCase().includes(searchQuery.toLowerCase());
-      const descMatch = event.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      return titleMatch || descMatch;
+      const titleMatch = event.title?.toLowerCase().includes(query);
+      const descMatch = event.description?.toLowerCase().includes(query);
+      const typeMatch = event.event_type?.toLowerCase().includes(query);
+      const metadataMatch = event.metadata_json?.toLowerCase().includes(query);
+      return titleMatch || descMatch || typeMatch || metadataMatch;
     });
   }, [data, searchQuery]);
 
@@ -374,9 +378,29 @@ export default function TimelineRoute() {
         >
           {/* Loading view */}
           {isLoading && !data && (
-            <Animated.View entering={FadeIn.duration(400)} style={styles.stateContainer}>
-              <ActivityIndicator size="large" color="#A855F7" />
-              <Text style={styles.loadingText}>Replaying focus sessions...</Text>
+            <Animated.View entering={FadeIn.duration(400)} style={{ gap: 20, marginVertical: 10 }}>
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', gap: 16 }}>
+                  {/* Time label placeholder */}
+                  <View style={{ width: 65, alignItems: 'flex-end', paddingTop: 8 }}>
+                    <Skeleton height={12} width="80%" />
+                  </View>
+                  {/* Node column placeholder */}
+                  <View style={{ width: 32, alignItems: 'center' }}>
+                    <Skeleton height={24} width={24} borderRadius={12} />
+                    <Skeleton height={60} width={2} style={{ marginTop: 8 }} />
+                  </View>
+                  {/* Card placeholder */}
+                  <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.02)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 14, gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Skeleton height={14} width="50%" />
+                      <Skeleton height={14} width="25%" />
+                    </View>
+                    <Skeleton height={12} width="90%" />
+                    <Skeleton height={12} width="70%" />
+                  </View>
+                </View>
+              ))}
             </Animated.View>
           )}
 
@@ -396,9 +420,9 @@ export default function TimelineRoute() {
           {data && filteredEvents.length === 0 && (
             <Animated.View entering={FadeInUp.duration(600)} style={styles.emptyContainer}>
               <Inbox size={48} color="#64748B" />
-              <Text style={styles.emptyTitle}>No Timeline Events</Text>
+              <Text style={styles.emptyTitle}>No Events Recorded</Text>
               <Text style={styles.emptySubtext}>
-                No focus score updates, telemetry streams, or notifications matched your criteria.
+                Start working and Cognitive Shield will automatically analyze your productivity.
               </Text>
             </Animated.View>
           )}

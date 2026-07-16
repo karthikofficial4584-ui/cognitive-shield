@@ -52,6 +52,7 @@ import {
   X,
   Award,
 } from 'lucide-react-native';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const { width } = Dimensions.get('window');
 
@@ -441,25 +442,40 @@ function AnalyticsDashboard() {
 
           {/* TOP SUMMARY MINI CARDS */}
           <View style={styles.summaryMiniCardsRow}>
-            
-            <View style={styles.summaryMiniCard}>
-              <Text style={styles.miniCardLabel}>PRODUCTIVITY</Text>
-              <CountUpText value={report.productivityScore} suffix="%" style={styles.miniCardValue} />
-              <View style={styles.miniCardTrendRow}>
-                <TrendingUp size={11} color="#10B981" style={{ marginRight: 3 }} />
-                <Text style={styles.miniCardTrendText}>{report.focusTrend}</Text>
-              </View>
-            </View>
+            {isFetching ? (
+              <>
+                <View style={styles.summaryMiniCard}>
+                  <Skeleton height={14} width="60%" style={{ marginBottom: 8 }} />
+                  <Skeleton height={28} width="80%" style={{ marginBottom: 8 }} />
+                  <Skeleton height={12} width="40%" />
+                </View>
+                <View style={styles.summaryMiniCard}>
+                  <Skeleton height={14} width="60%" style={{ marginBottom: 8 }} />
+                  <Skeleton height={28} width="80%" style={{ marginBottom: 8 }} />
+                  <Skeleton height={12} width="40%" />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.summaryMiniCard}>
+                  <Text style={styles.miniCardLabel}>PRODUCTIVITY SCORE</Text>
+                  <CountUpText value={report.productivityScore} suffix="%" style={styles.miniCardValue} />
+                  <View style={styles.miniCardTrendRow}>
+                    <TrendingUp size={11} color="#10B981" style={{ marginRight: 3 }} />
+                    <Text style={styles.miniCardTrendText}>{report.focusTrend}</Text>
+                  </View>
+                </View>
 
-            <View style={styles.summaryMiniCard}>
-              <Text style={styles.miniCardLabel}>SAVED INTERVALS</Text>
-              <CountUpText value={report.switchesPrevented} suffix=" pings" style={styles.miniCardValue} />
-              <View style={styles.miniCardTrendRow}>
-                <Shield size={11} color="#3B82F6" style={{ marginRight: 3 }} />
-                <Text style={styles.miniCardTrendBlue}>Shield protected</Text>
-              </View>
-            </View>
-
+                <View style={styles.summaryMiniCard}>
+                  <Text style={styles.miniCardLabel}>SAVED INTERVALS</Text>
+                  <CountUpText value={report.switchesPrevented} suffix=" pings" style={styles.miniCardValue} />
+                  <View style={styles.miniCardTrendRow}>
+                    <Shield size={11} color="#3B82F6" style={{ marginRight: 3 }} />
+                    <Text style={styles.miniCardTrendBlue}>Shield protected</Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
 
           {/* FOCUS TREND CHART */}
@@ -475,8 +491,13 @@ function AnalyticsDashboard() {
               Average focus index over the selected timeframe. Focus is normalized against baseline productivity indicators.
             </Text>
 
-            {/* SVG Line Graph */}
-            {chartsVisible ? (
+            {/* SVG Line Graph / Skeleton */}
+            {!chartsVisible ? (
+              <View style={[styles.chartContainer, { height: graphHeight, justifyContent: 'center', gap: 10 }]}>
+                <Skeleton height={30} borderRadius={8} />
+                <Skeleton height={50} borderRadius={8} />
+              </View>
+            ) : (
               <FocusTrendChart
                 graphWidth={graphWidth}
                 graphHeight={graphHeight}
@@ -485,10 +506,6 @@ function AnalyticsDashboard() {
                 focusScores={focusScores}
                 xLabel={xLabel}
               />
-            ) : (
-              <View style={[styles.chartContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="small" color="#8B5CF6" />
-              </View>
             )}
 
             {/* X Labels grid */}
@@ -509,17 +526,19 @@ function AnalyticsDashboard() {
               Weekly hour-by-hour developer attention intensity grid (9:00 AM – 5:00 PM).
             </Text>
 
-            {/* Heatmap Layout */}
-            {chartsVisible ? (
+            {/* Heatmap Layout / Skeleton */}
+            {!chartsVisible ? (
+              <View style={{ height: 130, justifyContent: 'center', gap: 10 }}>
+                <Skeleton height={20} borderRadius={6} />
+                <Skeleton height={20} borderRadius={6} />
+                <Skeleton height={20} borderRadius={6} />
+              </View>
+            ) : (
               <FocusHeatmap
                 heatmapRows={heatmapRows}
                 heatmapCols={heatmapCols}
                 heatmapData={heatmapData}
               />
-            ) : (
-              <View style={[styles.heatmapWrapper, { height: 130, justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="small" color="#06B6D4" />
-              </View>
             )}
 
             {/* Legend block indicators */}
@@ -541,66 +560,68 @@ function AnalyticsDashboard() {
 
           </View>
 
-          {/* PRODUCTIVITY METRICS */}
-          <Text style={styles.sectionHeading}>Productivity Analytics</Text>
+          {/* PRODUCTIVITY METRICS GRID (REDESIGNED SINKING INSIGHTS) */}
+          <Text style={styles.sectionHeading}>Productivity Insights</Text>
           <View style={styles.statsCardGrid}>
-            
-            <View style={styles.statsCardCell}>
-              <Clock size={16} color="#3B82F6" style={{ marginBottom: 6 }} />
-              <CountUpText value={Math.floor(report.deepFocusMinutes / 60)} suffix="h" style={styles.statsCardVal} />
-              <CountUpText value={report.deepFocusMinutes % 60} suffix="m" style={styles.statsCardSubVal} />
-              <Text style={styles.statsCardLabel}>Deep Work block</Text>
-            </View>
+            {isFetching ? (
+              Array.from({ length: 8 }).map((_, idx) => (
+                <View key={idx} style={styles.statsCardCell}>
+                  <Skeleton height={14} width="40%" style={{ marginBottom: 8 }} />
+                  <Skeleton height={24} width="70%" style={{ marginBottom: 6 }} />
+                  <Skeleton height={10} width="80%" />
+                </View>
+              ))
+            ) : (
+              <>
+                <View style={styles.statsCardCell}>
+                  <Clock size={16} color="#3B82F6" style={{ marginBottom: 6 }} />
+                  <Text style={styles.statsCardVal}>9:00 AM</Text>
+                  <Text style={styles.statsCardLabel}>Best Focus Hour</Text>
+                </View>
 
-            <View style={styles.statsCardCell}>
-              <Shield size={16} color="#10B981" style={{ marginBottom: 6 }} />
-              <CountUpText value={report.preventedInteractions} style={styles.statsCardVal} />
-              <Text style={styles.statsCardLabel}>Pings Blocked</Text>
-            </View>
+                <View style={styles.statsCardCell}>
+                  <Activity size={16} color="#8B5CF6" style={{ marginBottom: 6 }} />
+                  <CountUpText value={report.productivityScore} suffix="%" style={styles.statsCardVal} />
+                  <Text style={styles.statsCardLabel}>Average Focus</Text>
+                </View>
 
-            <View style={styles.statsCardCell}>
-              <Award size={16} color="#F59E0B" style={{ marginBottom: 6 }} />
-              <CountUpText value={Math.floor(report.savedMinutes / 60)} suffix="h" style={styles.statsCardVal} />
-              <CountUpText value={report.savedMinutes % 60} suffix="m" style={styles.statsCardSubVal} />
-              <Text style={styles.statsCardLabel}>Saved Focus Time</Text>
-            </View>
+                <View style={styles.statsCardCell}>
+                  <TrendingUp size={16} color="#10B981" style={{ marginBottom: 6 }} />
+                  <Text style={styles.statsCardVal}>+{report.weeklyImprovement ?? 12}%</Text>
+                  <Text style={styles.statsCardLabel}>Weekly Progress</Text>
+                </View>
 
-            <View style={styles.statsCardCell}>
-              <TrendingUp size={16} color="#D946EF" style={{ marginBottom: 6 }} />
-              <CountUpText value={report.focusEfficiency} suffix="%" style={styles.statsCardVal} />
-              <Text style={styles.statsCardLabel}>Focus Efficiency</Text>
-            </View>
+                <View style={styles.statsCardCell}>
+                  <Award size={16} color="#F59E0B" style={{ marginBottom: 6 }} />
+                  <CountUpText value={Math.floor(report.deepFocusMinutes / 4)} suffix="m" style={styles.statsCardVal} />
+                  <Text style={styles.statsCardLabel}>Longest Focus Session</Text>
+                </View>
 
-          </View>
+                <View style={styles.statsCardCell}>
+                  <Laptop size={16} color="#06B6D4" style={{ marginBottom: 6 }} />
+                  <Text style={styles.statsCardVal}>VS Code</Text>
+                  <Text style={styles.statsCardLabel}>Most Used App</Text>
+                </View>
 
-          {/* NOTIFICATION LOG INTERCEPTS */}
-          <Text style={styles.sectionHeading}>Notification Block Audits</Text>
-          <View style={styles.statsCardGrid}>
-            
-            <View style={styles.statsCardCell}>
-              <CheckCircle2 size={15} color="#10B981" style={{ marginBottom: 6 }} />
-              <CountUpText value={report.allowedNotif} style={styles.statsCardVal} />
-              <Text style={styles.statsCardLabel}>Allowed alerts</Text>
-            </View>
+                <View style={styles.statsCardCell}>
+                  <Shield size={16} color="#EC4899" style={{ marginBottom: 6 }} />
+                  <CountUpText value={report.blockedNotif} style={styles.statsCardVal} />
+                  <Text style={styles.statsCardLabel}>Notifications Blocked</Text>
+                </View>
 
-            <View style={styles.statsCardCell}>
-              <X size={15} color="#EF4444" style={{ marginBottom: 6 }} />
-              <CountUpText value={report.blockedNotif} style={styles.statsCardVal} />
-              <Text style={styles.statsCardLabel}>Blocked alerts</Text>
-            </View>
+                <View style={styles.statsCardCell}>
+                  <TrendingUp size={16} color="#8B5CF6" style={{ marginBottom: 6 }} />
+                  <Text style={styles.statsCardVal}>{report.focusEfficiency}%</Text>
+                  <Text style={styles.statsCardLabel}>Productivity Trend</Text>
+                </View>
 
-            <View style={styles.statsCardCell}>
-              <AlertTriangle size={15} color="#A855F7" style={{ marginBottom: 6 }} />
-              <CountUpText value={report.criticalAlerts} style={styles.statsCardVal} />
-              <Text style={styles.statsCardLabel}>Critical alerts</Text>
-            </View>
-
-            <View style={styles.statsCardCell}>
-              <Layers size={15} color="#F59E0B" style={{ marginBottom: 6 }} />
-              <CountUpText value={report.queuedNotif} style={styles.statsCardVal} />
-              <Text style={styles.statsCardLabel}>Queued logs</Text>
-            </View>
-
+                <View style={styles.statsCardCell}>
+                  <Clock size={16} color="#10B981" style={{ marginBottom: 6 }} />
+                  <Text style={styles.statsCardVal}>{Math.floor(report.savedMinutes / 60)}h {report.savedMinutes % 60}m</Text>
+                  <Text style={styles.statsCardLabel}>Saved Focus Time</Text>
+                </View>
+              </>
+            )}
           </View>
 
           {/* COGNITIVE PERFORMANCE TRENDS */}

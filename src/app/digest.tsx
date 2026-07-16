@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -45,6 +45,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { digestService } from '@/services/api';
 import { useShield } from '@/context/ShieldContext';
 import { useAuth } from '@/context/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const { width } = Dimensions.get('window');
 
@@ -246,10 +247,18 @@ function DigestScreen() {
           {/* ─── Loading State ────────────────────────────────────── */}
           {isLoading && !hasDigest && (
             <Animated.View entering={FadeIn.duration(400)} style={styles.stateContainer}>
-              <View style={styles.loadingCard}>
-                <ActivityIndicator size="large" color="#A855F7" />
-                <Text style={styles.loadingText}>Loading digest...</Text>
-                <Text style={styles.loadingSubtext}>Fetching your notification summary</Text>
+              <View style={[styles.loadingCard, { gap: 16, alignItems: 'stretch' }]}>
+                <View style={{ alignItems: 'center', marginBottom: 10 }}>
+                  <Skeleton height={28} width="60%" style={{ marginBottom: 10 }} />
+                  <Skeleton height={14} width="40%" />
+                </View>
+                <Skeleton height={80} borderRadius={16} />
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Skeleton height={60} style={{ flex: 1 }} borderRadius={14} />
+                  <Skeleton height={60} style={{ flex: 1 }} borderRadius={14} />
+                  <Skeleton height={60} style={{ flex: 1 }} borderRadius={14} />
+                </View>
+                <Skeleton height={100} borderRadius={16} />
               </View>
             </Animated.View>
           )}
@@ -306,12 +315,12 @@ function DigestScreen() {
             <AnimatedView style={pulseStyle}>
               <TouchableOpacity
                 onPress={() => generateMutation.mutate()}
-                disabled={generateMutation.isPending || queue.length === 0}
+                disabled={generateMutation.isPending}
                 activeOpacity={0.8}
-                style={[styles.generateBtnOuter, queue.length === 0 && styles.generateBtnDisabled]}
+                style={styles.generateBtnOuter}
               >
                 <LinearGradient
-                  colors={queue.length > 0 ? ['#7C3AED', '#A855F7', '#C084FC'] : ['#2A2B35', '#2A2B35']}
+                  colors={['#7C3AED', '#A855F7', '#C084FC']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.generateBtnGradient}
@@ -319,16 +328,18 @@ function DigestScreen() {
                   {generateMutation.isPending ? (
                     <ActivityIndicator size="small" color="#FFF" />
                   ) : (
-                    <Sparkles size={20} color={queue.length > 0 ? '#FFF' : '#64748B'} />
+                    <Sparkles size={20} color="#FFF" />
                   )}
-                  <Text style={[styles.generateBtnText, queue.length === 0 && styles.generateBtnTextDisabled]}>
+                  <Text style={styles.generateBtnText}>
                     {generateMutation.isPending ? 'Generating...' : 'Generate AI Digest'}
                   </Text>
-                  <View style={[styles.queueBadge, queue.length === 0 && styles.queueBadgeDisabled]}>
-                    <Text style={[styles.queueBadgeText, queue.length === 0 && { color: '#64748B' }]}>
-                      {queue.length}
-                    </Text>
-                  </View>
+                  {queue.length > 0 && (
+                    <View style={styles.queueBadge}>
+                      <Text style={styles.queueBadgeText}>
+                        {queue.length}
+                      </Text>
+                    </View>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </AnimatedView>
@@ -376,12 +387,28 @@ function DigestCard({ digest, isLatest = false }: { digest: DigestData; isLatest
 
   // Parse summary into parts
   const summaryLines = digest.summary.split('\n').filter(l => l.trim());
-  const headerLine = summaryLines[0] || '';
-  const bulletLines = summaryLines.filter(l => l.startsWith('•'));
+  const headerLine = summaryLines[0] || 'AI Focus Summary Compiled';
+  const bulletLines = summaryLines.filter(l => l.startsWith('•') || l.startsWith('-'));
   const importantIdx = summaryLines.findIndex(l => l.toLowerCase().includes('most important'));
   const importantLine = importantIdx >= 0 && summaryLines[importantIdx + 1]
     ? summaryLines[importantIdx + 1]
     : '';
+
+  // Structured recommendations based on actual data
+  const recommendationText = useMemo(() => {
+    if (digest.highest_urgency >= 0.8) {
+      return "Critical notifications were buffered to protect your cognitive flow. We recommend addressing the high-urgency alerts immediately, followed by standard team communications.";
+    }
+    return "Excellent focus stability maintained. Low-urgency messages were successfully deferred. We suggest taking a 5-minute cognitive rest before your next deep work session.";
+  }, [digest.highest_urgency]);
+
+  // Tomorrow's goal recommendation based on time saved
+  const goalText = useMemo(() => {
+    if (digest.time_saved_minutes >= 10) {
+      return "Goal: Aim to protect at least 80% of your workspace interruptions tomorrow to surpass today's saved focus time.";
+    }
+    return "Goal: Isolate your morning peak window (9:00 AM – 11:30 AM) to maintain flow state and buffer all team chatter.";
+  }, [digest.time_saved_minutes]);
 
   return (
     <View style={[styles.digestCard, isLatest && styles.digestCardLatest]}>
@@ -401,7 +428,7 @@ function DigestCard({ digest, isLatest = false }: { digest: DigestData; isLatest
           {isLatest && (
             <View style={styles.latestBadge}>
               <Zap size={10} color="#A855F7" />
-              <Text style={styles.latestBadgeText}>LATEST</Text>
+              <Text style={styles.latestBadgeText}>LATEST REPORT</Text>
             </View>
           )}
           <Text style={styles.digestCardDate}>{dateStr} · {timeStr}</Text>
@@ -412,8 +439,13 @@ function DigestCard({ digest, isLatest = false }: { digest: DigestData; isLatest
         </View>
       </View>
 
-      {/* Summary Header */}
-      <Text style={styles.summaryHeaderText}>{headerLine}</Text>
+      {/* SECTION 1: TODAY'S SUMMARY */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Today's Summary</Text>
+        <View style={styles.sectionContentCard}>
+          <Text style={styles.summaryHeaderText}>{headerLine}</Text>
+        </View>
+      </View>
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
@@ -425,7 +457,7 @@ function DigestCard({ digest, isLatest = false }: { digest: DigestData; isLatest
         <View style={styles.statPill}>
           <Timer size={12} color="#22C55E" />
           <CountUpText value={digest.time_saved_minutes} suffix="m" style={styles.statPillValueGreen} />
-          <Text style={styles.statPillLabel}>Saved</Text>
+          <Text style={styles.statPillLabel}>Time Saved</Text>
         </View>
         <View style={styles.statPill}>
           <TrendingUp size={12} color="#F59E0B" />
@@ -434,37 +466,80 @@ function DigestCard({ digest, isLatest = false }: { digest: DigestData; isLatest
         </View>
       </View>
 
-      {/* App Grouping */}
-      {appEntries.length > 0 && (
-        <View style={styles.appGroupSection}>
-          <Text style={styles.appGroupTitle}>Grouped by App</Text>
-          <View style={styles.appGroupGrid}>
-            {appEntries.map(([app, count]) => {
-              const appStyle = getAppStyle(app);
-              return (
-                <View key={app} style={[styles.appGroupChip, { backgroundColor: appStyle.bg }]}>
-                  <View style={[styles.appGroupDot, { backgroundColor: appStyle.icon }]} />
-                  <Text style={[styles.appGroupChipText, { color: appStyle.text }]}>{app}</Text>
-                  <View style={styles.appGroupCountBadge}>
-                    <Text style={styles.appGroupCountText}>{count}</Text>
+      {/* SECTION 2: HIGHLIGHTS */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Highlights</Text>
+        <View style={[styles.sectionContentCard, { gap: 10 }]}>
+          {appEntries.length > 0 && (
+            <View style={styles.appGroupGrid}>
+              {appEntries.map(([app, count]) => {
+                const appStyle = getAppStyle(app);
+                return (
+                  <View key={app} style={[styles.appGroupChip, { backgroundColor: appStyle.bg }]}>
+                    <View style={[styles.appGroupDot, { backgroundColor: appStyle.icon }]} />
+                    <Text style={[styles.appGroupChipText, { color: appStyle.text }]}>{app}</Text>
+                    <View style={styles.appGroupCountBadge}>
+                      <Text style={styles.appGroupCountText}>{count}</Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      )}
+                );
+              })}
+            </View>
+          )}
 
-      {/* Most Important */}
-      {importantLine ? (
-        <View style={styles.importantSection}>
-          <View style={styles.importantHeader}>
-            <AlertTriangle size={13} color="#F59E0B" />
-            <Text style={styles.importantLabel}>Most Important</Text>
-          </View>
-          <Text style={styles.importantText}>{importantLine}</Text>
+          {importantLine ? (
+            <View style={styles.importantSection}>
+              <View style={styles.importantHeader}>
+                <AlertTriangle size={13} color="#F59E0B" style={{ marginRight: 6 }} />
+                <Text style={styles.importantLabel}>Priority Warning</Text>
+              </View>
+              <Text style={styles.importantText}>{importantLine}</Text>
+            </View>
+          ) : null}
+
+          {bulletLines.length > 0 && (
+            <View style={{ marginTop: 6, gap: 4 }}>
+              {bulletLines.map((line, idx) => (
+                <Text key={idx} style={{ color: '#94A3B8', fontSize: 13, lineHeight: 18 }}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
-      ) : null}
+      </View>
+
+      {/* SECTION 3: RECOMMENDATIONS */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Recommendations</Text>
+        <LinearGradient
+          colors={['rgba(168, 85, 247, 0.08)', 'rgba(59, 130, 246, 0.03)']}
+          style={styles.sectionContentCard}
+        >
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+            <Sparkles size={14} color="#A855F7" style={{ marginTop: 2 }} />
+            <Text style={{ color: '#E2E8F0', fontSize: 13, lineHeight: 19, flex: 1 }}>
+              {recommendationText}
+            </Text>
+          </View>
+        </LinearGradient>
+      </View>
+
+      {/* SECTION 4: TOMORROW'S GOAL */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Tomorrow's Goal</Text>
+        <LinearGradient
+          colors={['rgba(34, 197, 94, 0.08)', 'rgba(16, 185, 129, 0.03)']}
+          style={styles.sectionContentCard}
+        >
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+            <TrendingUp size={14} color="#22C55E" style={{ marginTop: 2 }} />
+            <Text style={{ color: '#E2E8F0', fontSize: 13, lineHeight: 19, flex: 1, fontWeight: '500' }}>
+              {goalText}
+            </Text>
+          </View>
+        </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -894,5 +969,24 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // ─── AI Section Layout Styles ────────────────────────────────
+  sectionContainer: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: '#A855F7',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  sectionContentCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 16,
   },
 });
