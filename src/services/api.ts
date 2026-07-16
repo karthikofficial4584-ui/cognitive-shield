@@ -52,7 +52,9 @@ apiClient.interceptors.response.use(
       // Gracefully redirect to login on 401 without crashing
       router.replace('/login' as any);
     }
-    if (error.response && error.response.data && error.response.data.detail) {
+    if (error.config && error.config.skipErrorLog) {
+      // Suppress logging to console for expected client errors (e.g. 404 on getLatestDigest)
+    } else if (error.response && error.response.data && error.response.data.detail) {
       console.error('API Error:', error.response.data.detail);
     }
     return Promise.reject(error);
@@ -111,7 +113,14 @@ export const userService = {
     if (!hasToken()) return null;
     if (shouldHitBackend()) {
       const response = await apiClient.get('/auth/me');
-      return response.data;
+      const data = response.data;
+      if (data) {
+        return {
+          ...data,
+          memberSince: data.member_since ?? data.memberSince ?? 'Jul 2026',
+        };
+      }
+      return data;
     }
     return withRetry(async () => {
       // Mock GET /auth/me
@@ -133,13 +142,46 @@ export const focusService = {
     if (!hasToken()) return { focusScore: 0, state: 'Idle' };
     if (shouldHitBackend()) {
       const response = await apiClient.get('/focus/latest');
-      return response.data;
+      const data = response.data;
+      if (data) {
+        return {
+          focusScore: data.focus_score ?? data.focusScore ?? 0,
+          state: data.focus_state ?? data.state ?? 'Normal',
+        };
+      }
+      return data;
     }
     return { focusScore: 88, state: 'Focused' };
   },
-  updateThresholds: async (focusThreshold: number, urgencyThreshold: number) => {
+  getSettings: async () => {
+    if (!hasToken()) return null;
     if (shouldHitBackend()) {
-      const response = await apiClient.put('/settings', { focusThreshold, urgencyThreshold });
+      const response = await apiClient.get('/settings');
+      return response.data;
+    }
+    return null;
+  },
+  updateThresholds: async (
+    focusThreshold: number,
+    urgencyThreshold: number,
+    extraSettings?: {
+      enableNotif?: boolean;
+      criticalAlerts?: boolean;
+      soundEnabled?: boolean;
+      vibrationEnabled?: boolean;
+      queueAutoRelease?: boolean;
+    }
+  ) => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.put('/settings', {
+        focus_threshold: focusThreshold,
+        urgency_threshold: urgencyThreshold,
+        enable_notif: extraSettings?.enableNotif,
+        critical_alerts: extraSettings?.criticalAlerts,
+        sound_enabled: extraSettings?.soundEnabled,
+        vibration_enabled: extraSettings?.vibrationEnabled,
+        queue_auto_release: extraSettings?.queueAutoRelease,
+      });
       return response.data;
     }
     return { success: true, focusThreshold, urgencyThreshold };
@@ -168,7 +210,21 @@ export const notificationsService = {
     if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get('/notifications/logs');
-      return response.data;
+      if (Array.isArray(response.data)) {
+        return response.data.map((item: any) => ({
+          id: item.id,
+          sender: item.sender,
+          app: item.app_name ?? item.app ?? 'System',
+          title: item.title,
+          message: item.message,
+          time: item.created_at ? new Date(item.created_at).toTimeString().slice(0, 5) : '00:00',
+          status: item.status ?? 'Allowed',
+          urgencyScore: item.urgency_score ?? 0,
+          focusScore: item.focus_score_at_arrival ?? 0,
+          decisionText: item.decision_text ?? '',
+        }));
+      }
+      return [];
     }
     return [];
   },
@@ -184,7 +240,23 @@ export const queueService = {
     if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get('/queue');
-      return response.data;
+      if (Array.isArray(response.data)) {
+        return response.data.map((item: any) => ({
+          id: item.id,
+          sender: item.sender,
+          app: item.app_name ?? item.app ?? 'System',
+          title: item.title,
+          message: item.message,
+          timeReceived: item.created_at ? new Date(item.created_at).toTimeString().slice(0, 5) : '00:00',
+          focusScore: item.focus_score_at_arrival ?? item.focusScore ?? 0,
+          urgencyScore: item.urgency_score ?? item.urgencyScore ?? 0,
+          estReleaseTime: item.est_release_time ?? item.estReleaseTime ?? '5 mins',
+          queuePosition: item.queue_position ?? item.queuePosition ?? 1,
+          reason: item.reason ?? `Blocked because Focus Score was ${item.focus_score_at_arrival ?? 0} and Urgency was ${item.urgency_score ?? 0}.`,
+          status: item.status ?? 'Queued',
+        }));
+      }
+      return [];
     }
     return [];
   },
@@ -194,6 +266,13 @@ export const queueService = {
       return response.data;
     }
     return { success: true, id };
+  },
+  releaseTop: async () => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.post('/queue/release-top');
+      return response.data;
+    }
+    return { success: true };
   },
   releaseAll: async () => {
     if (shouldHitBackend()) {
@@ -205,6 +284,27 @@ export const queueService = {
   clearQueue: async () => {
     if (shouldHitBackend()) {
       const response = await apiClient.delete('/queue');
+      return response.data;
+    }
+    return { success: true };
+  },
+  deleteItem: async (id: string) => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.delete(`/queue/${id}`);
+      return response.data;
+    }
+    return { success: true, id };
+  },
+  pause: async () => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.post('/queue/pause');
+      return response.data;
+    }
+    return { success: true };
+  },
+  resume: async () => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.post('/queue/resume');
       return response.data;
     }
     return { success: true };
@@ -250,8 +350,15 @@ export const digestService = {
   getLatest: async () => {
     if (!hasToken()) return null;
     if (shouldHitBackend()) {
-      const response = await apiClient.get('/digest/latest');
-      return response.data;
+      try {
+        const response = await apiClient.get('/digest/latest', { skipErrorLog: true } as any);
+        return response.data;
+      } catch (error: any) {
+        if (error.response && error.response.status === 404) {
+          return null; // Gracefully return null empty state if no digest generated yet
+        }
+        throw error;
+      }
     }
     return null;
   },

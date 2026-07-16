@@ -100,12 +100,13 @@ function QueueManagerScreen() {
     releaseAll,
     clearQueue,
     deleteQueueItem,
+    isQueuePaused,
+    togglePauseQueue,
   } = useShield();
 
   const releaseThreshold = 75;
 
   // 1. Core States
-  const [isQueuePaused, setIsQueuePaused] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string>('1');
 
   // Stats derived state
@@ -186,8 +187,8 @@ function QueueManagerScreen() {
     showToast('Notification deleted from queue');
   };
 
-  const togglePauseQueue = () => {
-    setIsQueuePaused(!isQueuePaused);
+  const handleTogglePauseQueue = () => {
+    togglePauseQueue();
     if (!isQueuePaused) {
       showToast('Queue Locked manually');
     } else {
@@ -418,7 +419,7 @@ function QueueManagerScreen() {
             <View style={[styles.manualButtonsRow, { marginTop: 12 }]}>
               
               <TouchableOpacity
-                onPress={togglePauseQueue}
+                onPress={handleTogglePauseQueue}
                 style={[styles.manualBtnAction, isQueuePaused ? styles.btnActionActive : styles.btnActionInactive]}>
                 <Pause size={14} color="#FFF" style={{ marginRight: 6 }} />
                 <Text style={styles.manualBtnText}>{isQueuePaused ? 'Resume Lock' : 'Pause Lock'}</Text>

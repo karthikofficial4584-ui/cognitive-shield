@@ -168,12 +168,22 @@ export default function TimelineRoute() {
   };
 
   const { isAuthenticated } = useAuth();
+  const [pollInterval, setPollInterval] = useState<number | false>(5000);
+
   const { data, isLoading, isError, error, refetch } = useQuery<any[]>({
     queryKey,
     queryFn,
-    refetchInterval: 5000, // Polling auto refresh every 5 seconds
+    refetchInterval: isAuthenticated ? pollInterval : false,
     enabled: isAuthenticated,
   });
+
+  useEffect(() => {
+    if (isError) {
+      setPollInterval(false);
+    } else {
+      setPollInterval(5000);
+    }
+  }, [isError]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

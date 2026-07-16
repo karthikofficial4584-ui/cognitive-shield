@@ -225,11 +225,11 @@ function LiveFocusScreen() {
   const graphHeight = 110;
   
   const pathData = useMemo(() => {
-    if (focusHistory.length === 0) return '';
+    if (!focusHistory || focusHistory.length < 2) return '';
     const points = focusHistory.map((score, index) => {
       const x = (index / (focusHistory.length - 1)) * graphWidth;
       // Invert Y coordinate since SVG 0 is top
-      const y = graphHeight - (score / 100) * graphHeight;
+      const y = graphHeight - ((score ?? 0) / 100) * graphHeight;
       return { x, y };
     });
     
@@ -259,8 +259,11 @@ function LiveFocusScreen() {
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   const animatedGaugeProps = useAnimatedProps(() => {
+    const percent = typeof strokePercent.value === 'number' && !isNaN(strokePercent.value)
+      ? Math.max(0, Math.min(1.0, strokePercent.value))
+      : 0;
     return {
-      strokeDashoffset: CIRCUMFERENCE * (1 - strokePercent.value),
+      strokeDashoffset: CIRCUMFERENCE * (1 - percent),
     };
   });
 
@@ -425,10 +428,10 @@ function LiveFocusScreen() {
                   {pathData ? <Path d={pathData} fill="none" stroke="url(#lineGrad)" strokeWidth="3" /> : null}
 
                   {/* Glowing last point dot */}
-                  {focusHistory.length > 0 && (
+                  {focusHistory && focusHistory.length > 0 && (
                     <Circle
-                      cx={graphWidth}
-                      cy={graphHeight - (focusHistory[focusHistory.length - 1] / 100) * graphHeight}
+                      cx={focusHistory.length > 1 ? graphWidth : 0}
+                      cy={graphHeight - ((focusHistory[focusHistory.length - 1] ?? 0) / 100) * graphHeight}
                       r="4"
                       fill="#FFF"
                     />
@@ -440,7 +443,7 @@ function LiveFocusScreen() {
 
             <View style={styles.chartLegendRow}>
               <Text style={styles.legendText}>15 SEC ATTENTION VECTOR SHIFT</Text>
-              <Text style={styles.legendValue}>Avg: {Math.round(focusHistory.reduce((a,b)=>a+b,0)/focusHistory.length)}%</Text>
+              <Text style={styles.legendValue}>Avg: {!focusHistory || focusHistory.length === 0 ? 0 : Math.round(focusHistory.reduce((a, b) => a + (b ?? 0), 0) / focusHistory.length)}%</Text>
             </View>
 
           </View>

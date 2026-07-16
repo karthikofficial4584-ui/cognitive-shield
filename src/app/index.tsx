@@ -66,31 +66,56 @@ import { useShield } from '@/context/ShieldContext';
 
 function DashboardScreen() {
   const {
-    focusScore,
-    velocity: velocityScore,
-    activeActivity,
-    typingSpeed,
-    codeChanges,
-    windowConsistency: windowActivity,
-    queue,
-    notifications,
-    analytics,
-    demoModeActive: isDemoMode,
+    focusScore = 0,
+    velocity: velocityScore = 0,
+    activeActivity = 'Idle',
+    typingSpeed = 0,
+    codeChanges = 0,
+    windowConsistency: windowActivity = 0,
+    queue = [],
+    notifications = [],
+    analytics = {
+      productivityScore: 0,
+      focusTrend: '0%',
+      deepFocusMinutes: 0,
+      preventedInteractions: 0,
+      savedMinutes: 0,
+      focusEfficiency: 0,
+      allowedNotif: 0,
+      blockedNotif: 0,
+      criticalAlerts: 0,
+      queuedNotif: 0,
+      releasedNotif: 0,
+      avgQueueTime: 0,
+      avgVelocity: 0,
+      typingTrend: '0 WPM',
+      codeChangesTrend: '0 lines',
+      consistencyIndex: 0,
+      attentionStability: 0,
+      switchesPrevented: 0,
+      weeklyImprovement: 0,
+    },
+    demoModeActive: isDemoMode = false,
     startDemoSimulation,
     stopDemoSimulation,
     releaseAll,
-    criticalAlertActive,
-    isLoading,
-  } = useShield();
+    criticalAlertActive = false,
+    isLoading = false,
+  } = useShield() || {};
 
   const [isFocusMode, setIsFocusMode] = useState(false);
 
-  const focusState = focusScore >= 85 ? 'Deep Focus' : focusScore >= 75 ? 'Focused' : focusScore >= 50 ? 'Normal' : focusScore >= 30 ? 'Distracted' : 'Idle';
-  const queueCount = queue.length;
-  const notificationsBlocked = analytics.blockedNotif;
-  const criticalAlerts = analytics.criticalAlerts;
-  const deepFocusTime = Math.floor(analytics.deepFocusMinutes / 60) + 'h ' + (analytics.deepFocusMinutes % 60) + 'm';
-  const productivityScore = analytics.productivityScore;
+  const clampedFocusScore = typeof focusScore === 'number' && !isNaN(focusScore)
+    ? Math.max(0, Math.min(100, focusScore))
+    : 0;
+
+  const focusState = clampedFocusScore >= 85 ? 'Deep Focus' : clampedFocusScore >= 75 ? 'Focused' : clampedFocusScore >= 50 ? 'Normal' : clampedFocusScore >= 30 ? 'Distracted' : 'Idle';
+  const queueCount = (queue || []).length;
+  const notificationsBlocked = (analytics || {}).blockedNotif || 0;
+  const criticalAlerts = (analytics || {}).criticalAlerts || 0;
+  const deepFocusMins = (analytics || {}).deepFocusMinutes || 0;
+  const deepFocusTime = Math.floor(deepFocusMins / 60) + 'h ' + (deepFocusMins % 60) + 'm';
+  const productivityScore = (analytics || {}).productivityScore || 0;
 
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
@@ -163,8 +188,8 @@ function DashboardScreen() {
   const focusScoreShared = useSharedValue(85);
 
   useEffect(() => {
-    focusScoreShared.value = withTiming(focusScore, { duration: 1000, easing: Easing.out(Easing.quad) });
-  }, [focusScore]);
+    focusScoreShared.value = withTiming(clampedFocusScore, { duration: 1000, easing: Easing.out(Easing.quad) });
+  }, [clampedFocusScore]);
 
   // Pulsing telemetry glow effect
   useEffect(() => {
@@ -191,16 +216,19 @@ function DashboardScreen() {
 
   // Wave amplitude adjusts dynamically to focus score (calmer wave for higher score, chaotic for lower score)
   useEffect(() => {
-    const targetScale = 1.6 - (focusScore / 100); // 0.6 (flat/calm) to 1.6 (turbulent)
+    const targetScale = 1.6 - (clampedFocusScore / 100); // 0.6 (flat/calm) to 1.6 (turbulent)
     waveScaleY.value = withTiming(targetScale, { duration: 1200 });
-  }, [focusScore]);
+  }, [clampedFocusScore]);
 
   // Derived gauge path calculations
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   
   const animatedGaugeProps = useAnimatedProps(() => {
-    const strokeOffset = CIRCUMFERENCE * (1 - focusScoreShared.value / 100);
+    const scoreVal = typeof focusScoreShared.value === 'number' && !isNaN(focusScoreShared.value)
+      ? Math.max(0, Math.min(100, focusScoreShared.value))
+      : 0;
+    const strokeOffset = CIRCUMFERENCE * (1 - scoreVal / 100);
     return {
       strokeDashoffset: strokeOffset,
     };
@@ -232,7 +260,7 @@ function DashboardScreen() {
     return { primary: '#EF4444', secondary: '#B91C1C', text: '#EF4444', label: 'Idle', track: 'rgba(239, 68, 68, 0.15)' };
   };
 
-  const focusColors = getFocusColors(focusScore);
+  const focusColors = getFocusColors(clampedFocusScore);
 
   return (
     <LinearGradient
@@ -352,7 +380,7 @@ function DashboardScreen() {
 
               {/* Gauge central text overlay */}
               <View style={styles.gaugeCenterText}>
-                <Text style={styles.gaugeScore}>{focusScore}</Text>
+                <Text style={styles.gaugeScore}>{Math.round(clampedFocusScore)}</Text>
                 <Text style={[styles.gaugeState, { color: focusColors.text }]}>{focusState.toUpperCase()}</Text>
               </View>
             </View>

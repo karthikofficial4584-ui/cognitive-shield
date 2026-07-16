@@ -147,9 +147,9 @@ const FocusTrendChart = React.memo(function FocusTrendChart({
         {pathData ? <Path d={pathData} fill="none" stroke="url(#curveLineGrad)" strokeWidth="3" /> : null}
 
         {/* Vertices dot circles */}
-        {focusScores.map((score: number, index: number) => {
+        {focusScores && focusScores.length > 1 ? focusScores.map((score: number, index: number) => {
           const x = (index / (focusScores.length - 1)) * graphWidth;
-          const y = graphHeight - (score / 100) * graphHeight;
+          const y = graphHeight - ((score ?? 0) / 100) * graphHeight;
           return (
             <Circle
               key={index}
@@ -161,7 +161,16 @@ const FocusTrendChart = React.memo(function FocusTrendChart({
               strokeWidth="1.5"
             />
           );
-        })}
+        }) : focusScores && focusScores.length === 1 ? (
+          <Circle
+            cx={0}
+            cy={graphHeight - ((focusScores[0] ?? 0) / 100) * graphHeight}
+            r="3.5"
+            fill="#FFF"
+            stroke="#8B5CF6"
+            strokeWidth="1.5"
+          />
+        ) : null}
       </Svg>
     </View>
   );
@@ -334,10 +343,10 @@ function AnalyticsDashboard() {
   const graphHeight = 110;
 
   const pathData = useMemo(() => {
-    if (focusScores.length === 0) return '';
+    if (!focusScores || focusScores.length < 2) return '';
     const points = focusScores.map((score: number, index: number) => {
       const x = (index / (focusScores.length - 1)) * graphWidth;
-      const y = graphHeight - (score / 100) * graphHeight;
+      const y = graphHeight - ((score ?? 0) / 100) * graphHeight;
       return { x, y };
     });
 

@@ -156,7 +156,7 @@ function NotificationCenterScreen() {
       allowedToday: todayLogs.filter(n => n.decision === 'Allowed' || n.decision === 'Critical').length,
       blockedToday: todayLogs.filter(n => n.decision === 'Blocked').length,
       criticalAlerts: notifications.filter(n => n.decision === 'Critical').length,
-      avgUrgency: parseFloat((notifications.reduce((acc, curr) => acc + curr.urgency, 0) / notifications.length).toFixed(2)),
+      avgUrgency: !notifications || notifications.length === 0 ? 0 : parseFloat((notifications.reduce((acc, curr) => acc + (curr.urgency ?? 0), 0) / notifications.length).toFixed(2)),
       queueSize: notifications.filter(n => n.decision === 'Queued').length,
     };
   }, [notifications]);

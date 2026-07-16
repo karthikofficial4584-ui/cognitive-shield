@@ -105,6 +105,8 @@ interface ShieldContextProps {
   triggerManualAlert: (app: any, title: string, message: string, urgency: number) => void;
   toggleOfflineMode: () => void;
   fetchLatestState: () => Promise<void>;
+  isQueuePaused: boolean;
+  togglePauseQueue: () => void;
 
   // Global Settings (Unified and synchronized)
   focusThreshold: number;
@@ -168,76 +170,11 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
   const [windowConsistency, setWindowConsistency] = useState(90);
 
   // 2. Queue list
-  const [queue, setQueue] = useState<ShieldQueuedItem[]>([
-    {
-      id: '1',
-      sender: 'Slack',
-      app: 'Slack',
-      title: 'Dave: taco lunch?',
-      message: 'Dave: Hey Commander! Grab lunch at 12:15? Tacos down the street are really good.',
-      timeReceived: '22:30',
-      focusScore: 85,
-      urgencyScore: 0.12,
-      estReleaseTime: '6 mins',
-      queuePosition: 1,
-      reason: 'Blocked because Focus Score was 85 and urgency was 0.12.',
-      status: 'Queued',
-    },
-    {
-      id: '2',
-      sender: 'Microsoft Teams',
-      app: 'Teams',
-      title: 'Product Sync Update',
-      message: 'Sarah: Please post your progress updates in channel before the sync meeting.',
-      timeReceived: '22:15',
-      focusScore: 90,
-      urgencyScore: 0.25,
-      estReleaseTime: '12 mins',
-      queuePosition: 2,
-      reason: 'Blocked because Focus Score was 90 and urgency was 0.25.',
-      status: 'Queued',
-    },
-    {
-      id: '3',
-      sender: 'GitHub',
-      app: 'GitHub',
-      title: 'PR #42 Approved',
-      message: 'Reviewer: Approved changes in features/auth. Ready for merge.',
-      timeReceived: '21:55',
-      focusScore: 78,
-      urgencyScore: 0.45,
-      estReleaseTime: '3 mins',
-      queuePosition: 3,
-      reason: 'Blocked because Focus Score was 78 and urgency was 0.45.',
-      status: 'Queued',
-    },
-  ]);
+  const [queue, setQueue] = useState<ShieldQueuedItem[]>([]);
+  const [isQueuePaused, setIsQueuePaused] = useState(false);
 
   // 3. Notification Block logs
-  const [notifications, setNotifications] = useState<ShieldNotificationItem[]>([
-    {
-      id: 'n-1',
-      sender: 'Jira',
-      title: 'Ticket Assigned: SEC-904',
-      message: 'Jirabot: SEC-904 CSS styling bug was assigned to you with high priority.',
-      time: '21:00',
-      status: 'Allowed',
-      urgencyScore: 0.88,
-      focusScore: 82,
-      decisionText: 'Allowed: Urgency 0.88 exceeds Focus Score 82. Priority bypass.',
-    },
-    {
-      id: 'n-2',
-      sender: 'Slack',
-      title: 'Dave: taco lunch?',
-      message: 'Dave: Hey Commander! Grab lunch at 12:15?',
-      time: '22:30',
-      status: 'Blocked',
-      urgencyScore: 0.12,
-      focusScore: 85,
-      decisionText: 'Blocked: Focus Score 85 exceeds Urgency 0.12. Queued to buffer.',
-    },
-  ]);
+  const [notifications, setNotifications] = useState<ShieldNotificationItem[]>([]);
 
   // 4. Analytics metrics
   const [analytics, setAnalytics] = useState<ShieldAnalytics>({
@@ -287,6 +224,8 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
 
   const demoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const initialSettingsLoadedRef = useRef(false);
+
   // Sync state from backend if Online Mode is active
   const fetchLatestState = async () => {
     // Rely on isAuthenticated check
@@ -296,12 +235,16 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
         // Fetch current score
         const scoreData = await focusService.getScore();
         if (scoreData) {
-          setFocusScore(scoreData.focusScore);
+          setFocusScore(typeof scoreData.focusScore === 'number' ? scoreData.focusScore : 0);
         }
         // Fetch queue
         const queueData = await queueService.fetchQueue();
         if (queueData && Array.isArray(queueData)) {
-          setQueue(queueData);
+          setQueue(queueData.map(item => ({
+            ...item,
+            focusScore: item.focusScore ?? 0,
+            urgencyScore: item.urgencyScore ?? 0,
+          })));
         }
         // Fetch notifications
         const notifData = await notificationsService.fetchLogs();
@@ -309,16 +252,96 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
           setNotifications(notifData);
         }
         // Fetch profile/settings
-        const profile = await userService.getProfile();
-        if (profile) {
-          setFocusThreshold(profile.focusThreshold ?? 75);
-          setUrgencyThreshold(profile.urgencyThreshold ?? 0.85);
+        const userSettings = await focusService.getSettings();
+        if (userSettings) {
+          initialSettingsLoadedRef.current = false;
+          setFocusThreshold(userSettings.focus_threshold ?? userSettings.focusThreshold ?? 75);
+          setUrgencyThreshold(userSettings.urgency_threshold ?? userSettings.urgencyThreshold ?? 0.85);
+          if (userSettings.enable_notif !== undefined) setEnableNotif(userSettings.enable_notif);
+          if (userSettings.critical_alerts !== undefined) setCriticalAlerts(userSettings.critical_alerts);
+          if (userSettings.sound_enabled !== undefined) setSoundEnabled(userSettings.sound_enabled);
+          if (userSettings.vibration_enabled !== undefined) setVibrationEnabled(userSettings.vibration_enabled);
+          if (userSettings.queue_auto_release !== undefined) setQueueAutoRelease(userSettings.queue_auto_release);
+          setTimeout(() => {
+            initialSettingsLoadedRef.current = true;
+          }, 100);
         }
       } catch (error) {
         console.error('[ShieldContext] Error fetching backend state:', error);
       } finally {
         setIsLoading(false);
       }
+    } else {
+      // Mock defaults for offline mode
+      setQueue([
+        {
+          id: 'mock-1',
+          sender: 'Slack',
+          app: 'Slack',
+          title: 'Dave: taco lunch?',
+          message: 'Dave: Hey Commander! Grab lunch at 12:15? Tacos down the street are really good.',
+          timeReceived: '22:30',
+          focusScore: 85,
+          urgencyScore: 0.12,
+          estReleaseTime: '6 mins',
+          queuePosition: 1,
+          reason: 'Blocked because Focus Score was 85 and urgency was 0.12.',
+          status: 'Queued',
+        },
+        {
+          id: 'mock-2',
+          sender: 'Microsoft Teams',
+          app: 'Teams',
+          title: 'Product Sync Update',
+          message: 'Sarah: Please post your progress updates in channel before the sync meeting.',
+          timeReceived: '22:15',
+          focusScore: 90,
+          urgencyScore: 0.25,
+          estReleaseTime: '12 mins',
+          queuePosition: 2,
+          reason: 'Blocked because Focus Score was 90 and urgency was 0.25.',
+          status: 'Queued',
+        },
+        {
+          id: 'mock-3',
+          sender: 'GitHub',
+          app: 'GitHub',
+          title: 'PR #42 Approved',
+          message: 'Reviewer: Approved changes in features/auth. Ready for merge.',
+          timeReceived: '21:55',
+          focusScore: 78,
+          urgencyScore: 0.45,
+          estReleaseTime: '3 mins',
+          queuePosition: 3,
+          reason: 'Blocked because Focus Score was 78 and urgency was 0.45.',
+          status: 'Queued',
+        },
+      ]);
+      setNotifications([
+        {
+          id: 'mock-n-1',
+          sender: 'Jira',
+          title: 'Ticket Assigned: SEC-904',
+          message: 'Jirabot: SEC-904 CSS styling bug was assigned to you with high priority.',
+          time: '21:00',
+          status: 'Allowed',
+          urgencyScore: 0.88,
+          focusScore: 82,
+          decisionText: 'Allowed: Urgency 0.88 exceeds Focus Score 82. Priority bypass.',
+        },
+        {
+          id: 'mock-n-2',
+          sender: 'Slack',
+          title: 'Dave: taco lunch?',
+          message: 'Dave: Hey Commander! Grab lunch at 12:15?',
+          time: '22:30',
+          status: 'Blocked',
+          urgencyScore: 0.12,
+          focusScore: 85,
+          decisionText: 'Blocked: Focus Score 85 exceeds Urgency 0.12. Queued to buffer.',
+        },
+      ]);
+      setFocusHistory([76, 78, 77, 80, 81, 79, 82, 83, 80, 82, 84, 85, 83, 81, 82]);
     }
   };
 
@@ -330,11 +353,63 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isOffline, isAuthenticated]);
 
+  // Synchronize settings changes to backend
+  useEffect(() => {
+    if (IS_BACKEND_MODE && !isOffline && isAuthenticated && initialSettingsLoadedRef.current) {
+      const saveSettings = async () => {
+        try {
+          await focusService.updateThresholds(focusThreshold, urgencyThreshold, {
+            enableNotif,
+            criticalAlerts,
+            soundEnabled,
+            vibrationEnabled,
+            queueAutoRelease,
+          });
+        } catch (e) {
+          console.error('[ShieldContext] Failed to save settings to backend:', e);
+        }
+      };
+      const timer = setTimeout(saveSettings, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    focusThreshold,
+    urgencyThreshold,
+    enableNotif,
+    criticalAlerts,
+    soundEnabled,
+    vibrationEnabled,
+    queueAutoRelease,
+    isAuthenticated,
+    isOffline,
+  ]);
+
   // Toggle offline simulator
   const toggleOfflineMode = () => {
     const nextState = !isOffline;
     setIsOffline(nextState);
     setApiOfflineMode(nextState);
+  };
+
+  const togglePauseQueue = async () => {
+    const nextState = !isQueuePaused;
+    setIsQueuePaused(nextState);
+
+    if (IS_BACKEND_MODE && !isOffline) {
+      try {
+        if (nextState) {
+          await queueService.pause();
+        } else {
+          await queueService.resume();
+        }
+        // Refresh queue
+        const freshQueue = await queueService.fetchQueue();
+        setQueue(freshQueue);
+      } catch (e) {
+        setIsQueuePaused(!nextState);
+        console.error('[ShieldContext] Error toggling queue paused status:', e);
+      }
+    }
   };
 
   // Helper trigger notifications
@@ -441,73 +516,163 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
     if (queue.length === 0) return;
     const target = queue[0];
     
-    if (IS_BACKEND_MODE && !isOffline) {
-      try {
-        await queueService.releaseOne(target.id);
-      } catch (e) {
-        console.error('[ShieldContext] Error releasing top item from backend:', e);
-      }
-    }
+    // Optimistic Update
+    const prevQueue = [...queue];
+    const prevAnalytics = { ...analytics };
 
     setQueue(prev => prev.map((item, idx) => {
       if (idx === 0) return { ...item, status: 'Released' as const };
       return item;
     }));
 
-    setTimeout(() => {
-      setQueue(prev => prev.filter(item => item.id !== target.id).map((item, idx) => ({ ...item, queuePosition: idx + 1 })));
-      setAnalytics(prev => ({
-        ...prev,
-        releasedNotif: prev.releasedNotif + 1,
-        queuedNotif: Math.max(0, prev.queuedNotif - 1),
-      }));
-    }, 450);
+    if (IS_BACKEND_MODE && !isOffline) {
+      try {
+        // Verify target exists in backend queue before calling release
+        const latestQueue = await queueService.fetchQueue();
+        const itemExists = latestQueue.some((item: any) => item.id === target.id);
+        
+        if (!itemExists) {
+          console.log(`[ShieldContext] Synchronization Event: Queue item ${target.id} was already removed. Synchronizing state.`);
+          setQueue(latestQueue);
+          return;
+        }
+
+        try {
+          await queueService.releaseOne(target.id);
+        } catch (innerError: any) {
+          if (innerError.response && innerError.response.status === 404) {
+            console.log(`[ShieldContext] Synchronization Event: 404 on release for ${target.id}. Item was already removed.`);
+            const freshQueue = await queueService.fetchQueue();
+            setQueue(freshQueue);
+            return;
+          }
+          throw innerError;
+        }
+
+        const freshQueue = await queueService.fetchQueue();
+        setQueue(freshQueue);
+      } catch (e) {
+        // Rollback
+        setQueue(prevQueue);
+        setAnalytics(prevAnalytics);
+        console.error('[ShieldContext] Error releasing top item from backend:', e);
+        return;
+      }
+    } else {
+      setTimeout(() => {
+        setQueue(prev => prev.filter(item => item.id !== target.id).map((item, idx) => ({ ...item, queuePosition: idx + 1 })));
+      }, 450);
+    }
+
+    setAnalytics(prev => ({
+      ...prev,
+      releasedNotif: prev.releasedNotif + 1,
+      queuedNotif: Math.max(0, prev.queuedNotif - 1),
+    }));
   };
 
   const releaseAll = async () => {
     if (queue.length === 0) return;
 
+    // Optimistic Update
+    const prevQueue = [...queue];
+    const prevAnalytics = { ...analytics };
+
+    setQueue([]);
+
     if (IS_BACKEND_MODE && !isOffline) {
       try {
         await queueService.releaseAll();
+        const freshQueue = await queueService.fetchQueue();
+        setQueue(freshQueue);
       } catch (e) {
+        // Rollback
+        setQueue(prevQueue);
+        setAnalytics(prevAnalytics);
         console.error('[ShieldContext] Error releasing all from backend:', e);
+        return;
       }
     }
 
-    setQueue(prev => prev.map(item => ({ ...item, status: 'Released' as const })));
-    setTimeout(() => {
-      const releaseCount = queue.length;
-      setQueue([]);
-      setAnalytics(prev => ({
-        ...prev,
-        releasedNotif: prev.releasedNotif + releaseCount,
-        queuedNotif: 0,
-      }));
-    }, 600);
+    setAnalytics(prev => ({
+      ...prev,
+      releasedNotif: prev.releasedNotif + prevQueue.length,
+      queuedNotif: 0,
+    }));
   };
 
   const clearQueue = async () => {
+    // Optimistic Update
+    const prevQueue = [...queue];
+    const prevAnalytics = { ...analytics };
+
+    setQueue([]);
+
     if (IS_BACKEND_MODE && !isOffline) {
       try {
         await queueService.clearQueue();
+        const freshQueue = await queueService.fetchQueue();
+        setQueue(freshQueue);
       } catch (e) {
+        // Rollback
+        setQueue(prevQueue);
+        setAnalytics(prevAnalytics);
         console.error('[ShieldContext] Error clearing queue from backend:', e);
+        return;
       }
     }
-    setQueue([]);
-    setAnalytics(prev => ({ ...prev, queuedNotif: 0 }));
+
+    setAnalytics(prev => ({
+      ...prev,
+      queuedNotif: 0,
+    }));
   };
 
   const deleteQueueItem = async (id: string) => {
+    const target = queue.find(item => item.id === id);
+    if (!target) return;
+
+    // Optimistic Update
+    const prevQueue = [...queue];
+    const prevAnalytics = { ...analytics };
+
+    setQueue(prev => prev.filter(item => item.id !== id).map((item, idx) => ({ ...item, queuePosition: idx + 1 })));
+
     if (IS_BACKEND_MODE && !isOffline) {
       try {
-        await queueService.releaseOne(id); // Delete is mapped to releaseOne/resolve in API mock
+        // Verify target exists in backend queue before calling delete
+        const latestQueue = await queueService.fetchQueue();
+        const itemExists = latestQueue.some((item: any) => item.id === id);
+        
+        if (!itemExists) {
+          console.log(`[ShieldContext] Synchronization Event: Queue item ${id} was already removed. Synchronizing state.`);
+          setQueue(latestQueue);
+          return;
+        }
+
+        try {
+          await queueService.deleteItem(id);
+        } catch (innerError: any) {
+          if (innerError.response && innerError.response.status === 404) {
+            console.log(`[ShieldContext] Synchronization Event: 404 on delete for ${id}. Item was already removed.`);
+            const freshQueue = await queueService.fetchQueue();
+            setQueue(freshQueue);
+            return;
+          }
+          throw innerError;
+        }
+
+        const freshQueue = await queueService.fetchQueue();
+        setQueue(freshQueue);
       } catch (e) {
+        // Rollback
+        setQueue(prevQueue);
+        setAnalytics(prevAnalytics);
         console.error('[ShieldContext] Error deleting queue item from backend:', e);
+        return;
       }
     }
-    setQueue(prev => prev.filter(item => item.id !== id).map((item, idx) => ({ ...item, queuePosition: idx + 1 })));
+
     setAnalytics(prev => ({
       ...prev,
       queuedNotif: Math.max(0, prev.queuedNotif - 1),
@@ -669,6 +834,8 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
         triggerManualAlert,
         toggleOfflineMode,
         fetchLatestState,
+        isQueuePaused,
+        togglePauseQueue,
 
         // Settings (unified state)
         focusThreshold,

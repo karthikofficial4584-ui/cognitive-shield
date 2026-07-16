@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { getToken, setToken, removeToken } from '../utils/storage';
 import { authService, setAuthToken, apiClient, userService } from '../services/api';
 import { router } from 'expo-router';
 
@@ -24,7 +24,7 @@ interface AuthContextProps {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-const TOKEN_KEY = 'shield_jwt_token';
+
 
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const restoreSession = async () => {
     try {
       setIsLoading(true);
-      const storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+      const storedToken = await getToken();
       
       if (storedToken) {
         setAuthToken(storedToken);
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.replace('/login');
       }
     } catch (e) {
-      console.error('SecureStore error:', e);
+      console.error('Storage error:', e);
       router.replace('/login');
     } finally {
       setIsLoading(false);
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const token = response.access_token || response.token;
       if (token) {
-        await SecureStore.setItemAsync(TOKEN_KEY, token);
+        await setToken(token);
         setAuthToken(token);
         setAccessToken(token);
         
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await removeToken();
       setAuthToken(null);
       setAccessToken(null);
       setIsAuthenticated(false);
