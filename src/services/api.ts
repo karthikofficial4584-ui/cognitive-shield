@@ -183,3 +183,32 @@ export const analyticsService = {
     return { range, timestamp: Date.now() };
   },
 };
+
+export const coachService = {
+  fetchCoachData: async (timeframe: 'today' | 'week' | 'month' = 'today') => {
+    if (shouldHitBackend()) {
+      const response = await apiClient.get(`/coach/${timeframe}`);
+      return response.data;
+    }
+    // Mock Data
+    return withRetry(async () => {
+      return {
+        overall_ai_score: 85,
+        productivity_score: 88,
+        focus_trend: "Improving",
+        burnout_risk: "Low",
+        peak_focus_hours: ["09:00 - 11:00", "14:00 - 15:00"],
+        most_distracting_apps: ["Slack", "Discord"],
+        deep_work_duration_minutes: 120,
+        saved_interruptions: 15,
+        queue_efficiency: 95,
+        ai_recommendations: [
+          "Your most productive period is between 9 AM and 11 AM.",
+          "Consider scheduling meetings after your peak focus hours.",
+          "Take a short break after long deep-focus sessions.",
+          "Reduce notifications from your most distracting application."
+        ]
+      };
+    });
+  }
+};
