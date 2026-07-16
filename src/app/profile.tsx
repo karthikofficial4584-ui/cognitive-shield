@@ -125,8 +125,10 @@ const switchStyles = StyleSheet.create({
 });
 
 import { useShield } from '@/context/ShieldContext';
+import { useAuth } from '@/context/AuthContext';
 
 function ProfileSettingsScreen() {
+  const { logout } = useAuth();
   const {
     analytics,
     isOffline,
@@ -191,8 +193,9 @@ function ProfileSettingsScreen() {
     showToast('Local cached telemetry logs deleted successfully');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     showToast('Google account logged out. Sandbox active.');
+    await logout();
   };
 
   const handleDeleteAccount = () => {
@@ -281,6 +284,15 @@ function ProfileSettingsScreen() {
                   <Calendar size={11} color="#64748B" style={{ marginRight: 4 }} />
                   <Text style={styles.profileMetaText}>Member since: {memberSince}</Text>
                 </View>
+                <View style={styles.profileMetaRow}>
+                  <Shield size={11} color="#10B981" style={{ marginRight: 4 }} />
+                  <Text style={styles.profileMetaText}>Windows Agent: Active</Text>
+                </View>
+                <View style={styles.profileMetaRow}>
+                  <Activity size={11} color="#64748B" style={{ marginRight: 4 }} />
+                  <Text style={styles.profileMetaText}>Last Sync: Just now</Text>
+                </View>
+
               </View>
 
             </View>
@@ -361,8 +373,8 @@ function ProfileSettingsScreen() {
 
           </View>
 
-          {/* FOCUS SETTINGS (SLIDERS) */}
-          <Text style={styles.sectionHeading}>Focus Settings Configuration</Text>
+          {/* ACCOUNT SETTINGS */}
+          <Text style={styles.sectionHeading}>Account</Text>
           <View style={styles.glassCard}>
             
             <View style={styles.sliderItem}>
@@ -428,8 +440,7 @@ function ProfileSettingsScreen() {
 
           </View>
 
-          {/* NOTIFICATION SETTINGS */}
-          <Text style={styles.sectionHeading}>Notification Settings</Text>
+          <Text style={styles.sectionHeading}>Notifications (Account)</Text>
           <View style={styles.glassCard}>
             
             <View style={styles.settingToggleRow}>
@@ -475,7 +486,7 @@ function ProfileSettingsScreen() {
           </View>
 
           {/* APPEARANCE */}
-          <Text style={styles.sectionHeading}>Appearance & Theme</Text>
+          <Text style={styles.sectionHeading}>Appearance</Text>
           <View style={styles.glassCard}>
             
             <View style={styles.settingToggleRow}>
@@ -538,7 +549,7 @@ function ProfileSettingsScreen() {
           </View>
 
           {/* PRIVACY */}
-          <Text style={styles.sectionHeading}>Privacy & Permissions</Text>
+          <Text style={styles.sectionHeading}>Privacy</Text>
           <View style={styles.glassCard}>
             
             <View style={styles.settingToggleRow}>
@@ -573,7 +584,7 @@ function ProfileSettingsScreen() {
           </View>
 
           {/* SECURITY & LINKED ACCOUNTS */}
-          <Text style={styles.sectionHeading}>Security Configurations</Text>
+          <Text style={styles.sectionHeading}>Security (Account)</Text>
           <View style={styles.glassCard}>
             
             <View style={styles.securityRow}>
@@ -609,20 +620,12 @@ function ProfileSettingsScreen() {
               <Text style={styles.securityBadgeOk}>SECURE</Text>
             </View>
 
-            <TouchableOpacity onPress={handleLogout} style={[styles.btnOutlineAction, { marginTop: 16 }]}>
-              <LogOut size={14} color="#FFF" style={{ marginRight: 6 }} />
-              <Text style={styles.outlineActionText}>Logout Google Auth session</Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleDeleteAccount} style={[styles.btnDangerAction, { marginTop: 12 }]}>
-              <AlertTriangle size={14} color="#EF4444" style={{ marginRight: 6 }} />
-              <Text style={styles.dangerActionText}>Urgently Terminate Shield Account</Text>
-            </TouchableOpacity>
 
           </View>
 
           {/* HELP & SUPPORT */}
-          <Text style={styles.sectionHeading}>Daemon Help Center</Text>
+          <Text style={styles.sectionHeading}>Support</Text>
           <View style={styles.glassCard}>
             
             <TouchableOpacity onPress={() => showToast('Redirecting to FAQ index...')} style={styles.helpItemRow}>
@@ -652,10 +655,11 @@ function ProfileSettingsScreen() {
           </View>
 
           {/* ABOUT APP INFO */}
+          <Text style={styles.sectionHeading}>About</Text>
           <View style={styles.glassCard}>
             <View style={styles.aboutHeader}>
               <Shield size={22} color={activeColor} />
-              <Text style={styles.aboutTitle}>The Cognitive Shield Daemon</Text>
+              <Text style={styles.aboutTitle}>Cognitive Shield</Text>
             </View>
             <View style={styles.aboutMetaRow}>
               <Text style={styles.aboutMetaLabel}>Application Version</Text>
@@ -679,11 +683,15 @@ function ProfileSettingsScreen() {
             </View>
           </View>
 
-          {/* Footer branding */}
           <View style={styles.footerBranding}>
             <Shield size={12} color="#64748B" style={{ marginRight: 6 }} />
-            <Text style={styles.footerBrandingText}>COGNITIVE SHIELD v1.0.0 SECURE BUILD</Text>
+            <Text style={styles.footerBrandingText}>COGNITIVE SHIELD v1.0.0</Text>
           </View>
+          
+          <TouchableOpacity onPress={handleLogout} style={[styles.btnOutlineAction, { marginTop: 16, borderColor: '#EF4444' }]}>
+            <LogOut size={14} color="#EF4444" style={{ marginRight: 6 }} />
+            <Text style={[styles.outlineActionText, { color: '#EF4444' }]}>Logout</Text>
+          </TouchableOpacity>
 
         </ScrollView>
       </SafeAreaView>

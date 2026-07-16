@@ -1,9 +1,9 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme, View, ActivityIndicator, StyleSheet, Text, Platform } from 'react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Slot, useSegments, useRouter } from 'expo-router';
+import { Slot, useSegments, useRouter, Redirect } from 'expo-router';
 import { useEffect } from 'react';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -100,22 +100,16 @@ function AuthStack() {
 }
 
 function NavigationGate() {
-  const colorScheme = useColorScheme();
   const { isLoading, isAuthenticated } = useAuth();
   const segments = useSegments();
-  const router = useRouter();
+  const queryClient = useQueryClient();
 
+  // Clear react query cache when a user logs out
   useEffect(() => {
-    if (isLoading) return;
-    
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'register';
-
-    if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/');
+    if (!isLoading && !isAuthenticated) {
+      queryClient.clear();
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading]);
 
   if (isLoading) {
     return (
@@ -126,8 +120,19 @@ function NavigationGate() {
     );
   }
 
-  const inAuthGroup = segments[0] === 'login' || segments[0] === 'register';
+  const inAuthGroup = segments[0] === 'login' || segments[0] === 'register' || segments.includes('login') || segments.includes('register');
 
+  if (!isAuthenticated && !inAuthGroup) {
+    // Completely unmounts the protected tree (RootApp) and performs the redirect safely.
+    return <Redirect href="/login" />;
+  }
+
+  if (isAuthenticated && inAuthGroup) {
+    // Authenticated user trying to access the login page
+    return <Redirect href="/" />;
+  }
+
+  // At this point, if they are authenticated, they should render the protected app tree.
   if (isAuthenticated) {
     return (
       <ShieldProvider>
@@ -136,16 +141,7 @@ function NavigationGate() {
     );
   }
 
-  // To prevent mounting protected routes (e.g. index.tsx) during redirect,
-  // do not render Slot if we are not on login/register pages yet.
-  if (!inAuthGroup) {
-    return (
-      <LinearGradient colors={['#07080D', '#0F0E23', '#1A0C2F']} style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-      </LinearGradient>
-    );
-  }
-
+  // Otherwise, they are unauthenticated and already in the auth group.
   return <AuthStack />;
 }
 

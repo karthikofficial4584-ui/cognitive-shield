@@ -101,9 +101,15 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
+            <View style={styles.optionsRow}>
+              <View style={styles.rememberMeContainer}>
+                <View style={styles.checkboxPlaceholder} />
+                <Text style={styles.rememberMeText}>Remember Me (Coming Soon)</Text>
+              </View>
+              <TouchableOpacity style={styles.forgotPassword}>
+                <Text style={styles.forgotPasswordText}>Forgot Password? (Coming Soon)</Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity 
               style={[styles.loginBtn, isLoading && styles.loginBtnDisabled]}
@@ -237,14 +243,37 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
   },
-  forgotPassword: {
-    alignSelf: 'flex-end',
+  optionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
+  },
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkboxPlaceholder: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.4)',
+    marginRight: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.3)',
+  },
+  rememberMeText: {
+    color: '#94A3B8',
+    fontSize: 13,
+  },
+  forgotPassword: {
+    //
   },
   forgotPasswordText: {
     color: '#A855F7',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
+    opacity: 0.8,
   },
   loginBtn: {
     height: 52,

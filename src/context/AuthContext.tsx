@@ -130,7 +130,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(false);
       setCurrentUser(null);
       await authService.logout().catch(() => {});
-      router.replace('/login');
     } catch (error) {
       console.error('Logout error:', error);
     }

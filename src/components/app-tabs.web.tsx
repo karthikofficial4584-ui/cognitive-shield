@@ -17,7 +17,7 @@ import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function AppTabs() {
   const { width } = useWindowDimensions();
-  const isSidebar = width > 1024;
+  const isSidebar = width >= 768; // Desktop and Tablet keep sidebar
 
   return (
     <Tabs style={isSidebar ? styles.webLayoutSidebar : styles.webLayoutBottom}>
@@ -125,20 +125,9 @@ export function CustomTabList({ children, isSidebar, ...props }: TabListProps & 
 
   return (
     <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          Cognitive Shield
-        </ThemedText>
-
+      <View style={styles.innerContainer}>
         {children}
-
-        <ExternalLink href="https://docs.expo.dev" asChild>
-          <Pressable style={styles.externalPressable}>
-            <ThemedText type="link" style={{ marginRight: 4 }}>Docs</ThemedText>
-            <LinkIcon size={12} color={colors.text} />
-          </Pressable>
-        </ExternalLink>
-      </ThemedView>
+      </View>
     </View>
   );
 }
@@ -202,31 +191,29 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
   },
   tabListContainer: {
-    position: 'absolute',
-    bottom: 0,
     width: '100%',
-    padding: Spacing.three,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.two,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-    zIndex: 100,
+    backgroundColor: 'rgba(7, 8, 13, 0.85)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    // Glassmorphism effect for web
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
   },
   innerContainer: {
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
+    paddingHorizontal: Spacing.three,
     borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-around',
     flexGrow: 1,
-    gap: Spacing.two,
     maxWidth: MaxContentWidth,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 5,
+    backgroundColor: 'transparent',
   },
   brandText: {
     marginRight: 'auto',
@@ -235,11 +222,13 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   tabButtonView: {
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   tabButtonSidebar: {
     paddingVertical: Spacing.two,

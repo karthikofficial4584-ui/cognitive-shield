@@ -394,121 +394,29 @@ function DashboardScreen() {
             </View>
           </View>
 
-          {/* FOCUS WAVE ANIMATED SVG */}
+          {/* WEEKLY PROGRESS & DAILY GOAL */}
           <View style={styles.glassCardNoPadding}>
             <View style={styles.waveHeader}>
               <View>
-                <Text style={styles.waveTitle}>Neural Waveform</Text>
-                <Text style={styles.waveSubtitle}>Real-time EEG telemetry simulation</Text>
+                <Text style={styles.waveTitle}>Weekly Progress</Text>
+                <Text style={styles.waveSubtitle}>Tracking your deep work goals</Text>
               </View>
-              <Zap size={18} color={focusColors.primary} />
+              <TrendingUp size={18} color="#3B82F6" />
             </View>
-
-            {/* Moving SVG Waves Container */}
-            <View style={styles.waveContainer}>
-              <AnimatedView style={[styles.waveOffsetWrapper, waveContainerStyle]}>
-                
-                {/* Wave 1 */}
-                <AnimatedView style={[styles.waveVector, wave1Style]}>
-                  <Svg width={800} height={120} viewBox="0 0 800 120" preserveAspectRatio="none">
-                    <Defs>
-                      <SvgGradient id="wave1Grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <Stop offset="0%" stopColor="#3B82F6" stopOpacity="0.4" />
-                        <Stop offset="50%" stopColor="#8B5CF6" stopOpacity="0.6" />
-                        <Stop offset="100%" stopColor="#3B82F6" stopOpacity="0.4" />
-                      </SvgGradient>
-                    </Defs>
-                    <Path
-                      d="M0,60 C150,110 250,10 400,60 C550,110 650,10 800,60 L800,120 L0,120 Z"
-                      fill="url(#wave1Grad)"
-                    />
-                  </Svg>
-                </AnimatedView>
-
-                {/* Wave 2 */}
-                <AnimatedView style={[styles.waveVector, wave2Style, { top: 5 }]}>
-                  <Svg width={800} height={120} viewBox="0 0 800 120" preserveAspectRatio="none">
-                    <Defs>
-                      <SvgGradient id="wave2Grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <Stop offset="0%" stopColor="#A855F7" stopOpacity="0.3" />
-                        <Stop offset="50%" stopColor="#EC4899" stopOpacity="0.5" />
-                        <Stop offset="100%" stopColor="#A855F7" stopOpacity="0.3" />
-                      </SvgGradient>
-                    </Defs>
-                    <Path
-                      d="M0,70 C120,20 280,100 400,70 C520,20 680,100 800,70 L800,120 L0,120 Z"
-                      fill="url(#wave2Grad)"
-                    />
-                  </Svg>
-                </AnimatedView>
-
-              </AnimatedView>
-
-              {/* Status overlay on wave */}
-              <View style={styles.waveOverlay}>
-                <Text style={styles.waveStateValue}>{focusScore} Hz</Text>
-                <Text style={styles.waveStateLabel}>Resonance Frequency</Text>
+            <View style={{ padding: 20 }}>
+              <View style={styles.progressItem}>
+                <View style={styles.progressLabelRow}>
+                  <Text style={styles.progressLabel}>Daily Goal Progress</Text>
+                  <Text style={styles.progressValue}>{(clampedFocusScore / 100 * 100).toFixed(0)}%</Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${clampedFocusScore}%`, backgroundColor: '#3B82F6' }]} />
+                </View>
               </View>
             </View>
           </View>
 
-          {/* COGNITIVE VELOCITY CARD */}
-          <View style={styles.glassCard}>
-            <View style={styles.velocityHeader}>
-              <View style={styles.row}>
-                <Activity size={18} color="#A855F7" style={{ marginRight: 8 }} />
-                <Text style={styles.cardTitle}>Cognitive Velocity</Text>
-              </View>
-              <View style={styles.badgeContainer}>
-                <Text style={styles.badgeText}>{velocityScore} VS</Text>
-              </View>
-            </View>
 
-            <Text style={styles.velocityDesc}>
-              Measures work cadence, input rate, and program-switching velocity.
-            </Text>
-
-            {/* Velocity metrics progress bars */}
-            <View style={styles.progressItem}>
-              <View style={styles.progressLabelRow}>
-                <View style={styles.row}>
-                  <Keyboard size={14} color="#3B82F6" style={{ marginRight: 6 }} />
-                  <Text style={styles.progressLabel}>Typing Cadence</Text>
-                </View>
-                <Text style={styles.progressValue}>{typingSpeed} WPM</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${(typingSpeed / 120) * 100}%`, backgroundColor: '#3B82F6' }]} />
-              </View>
-            </View>
-
-            <View style={styles.progressItem}>
-              <View style={styles.progressLabelRow}>
-                <View style={styles.row}>
-                  <FileCode size={14} color="#8B5CF6" style={{ marginRight: 6 }} />
-                  <Text style={styles.progressLabel}>Code Modifications</Text>
-                </View>
-                <Text style={styles.progressValue}>+{codeChanges} Lines</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${Math.min((codeChanges / 400) * 100, 100)}%`, backgroundColor: '#8B5CF6' }]} />
-              </View>
-            </View>
-
-            <View style={styles.progressItem}>
-              <View style={styles.progressLabelRow}>
-                <View style={styles.row}>
-                  <Laptop size={14} color="#D946EF" style={{ marginRight: 6 }} />
-                  <Text style={styles.progressLabel}>Window Turbulence</Text>
-                </View>
-                <Text style={styles.progressValue}>{windowActivity} Active Apps</Text>
-              </View>
-              {/* Progress bar fill for window activity is reversed, because fewer window activity is better for focus */}
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${Math.max(100 - (windowActivity * 10), 10)}%`, backgroundColor: '#D946EF' }]} />
-              </View>
-            </View>
-          </View>
 
           {/* AI INSIGHT CARD */}
           <LinearGradient
@@ -516,7 +424,7 @@ function DashboardScreen() {
             style={styles.aiInsightCard}>
             <View style={styles.row}>
               <Sparkles size={18} color="#D946EF" style={{ marginRight: 8 }} />
-              <Text style={styles.aiTitle}>Cognitive AI Shield Insight</Text>
+              <Text style={styles.aiTitle}>Productivity Trend</Text>
             </View>
             <View style={styles.aiMetricsRow}>
               <View style={styles.aiMetricCell}>
@@ -623,62 +531,7 @@ function DashboardScreen() {
 
           </View>
 
-          {/* LIVE STATUS PANEL */}
-          <View style={styles.glassCard}>
-            <Text style={styles.cardTitle}>Shield Telemetry Status</Text>
-            <View style={styles.statusList}>
-              
-              <View style={styles.statusRow}>
-                <View style={styles.row}>
-                  <Shield size={14} color="#10B981" style={{ marginRight: 8 }} />
-                  <Text style={styles.statusLabel}>Monitoring Shield</Text>
-                </View>
-                <View style={styles.row}>
-                  <Text style={styles.statusStateOk}>ACTIVE</Text>
-                  <AnimatedView style={[styles.statusIndicatorPulse, pulseStyle, { backgroundColor: '#10B981' }]} />
-                </View>
-              </View>
 
-              <View style={styles.statusRow}>
-                <View style={styles.row}>
-                  <Wifi size={14} color="#3B82F6" style={{ marginRight: 8 }} />
-                  <Text style={styles.statusLabel}>Telemetry Stream</Text>
-                </View>
-                <View style={styles.row}>
-                  <Text style={styles.statusStateOk}>CONNECTED</Text>
-                  <AnimatedView style={[styles.statusIndicatorPulse, pulseStyle, { backgroundColor: '#3B82F6' }]} />
-                </View>
-              </View>
-
-              <View style={styles.statusRow}>
-                <View style={styles.row}>
-                  <Database size={14} color="#8B5CF6" style={{ marginRight: 8 }} />
-                  <Text style={styles.statusLabel}>Backend Node</Text>
-                </View>
-                <View style={styles.row}>
-                  <Text style={styles.statusStateOk}>CONNECTED</Text>
-                  <AnimatedView style={[styles.statusIndicatorPulse, pulseStyle, { backgroundColor: '#8B5CF6' }]} />
-                </View>
-              </View>
-
-              <View style={styles.statusRow}>
-                <View style={styles.row}>
-                  <Link size={14} color="#06B6D4" style={{ marginRight: 8 }} />
-                  <Text style={styles.statusLabel}>API Service Gateway</Text>
-                </View>
-                <Text style={styles.statusStateInfo}>ONLINE (200 OK)</Text>
-              </View>
-
-              <View style={styles.statusRow}>
-                <View style={styles.row}>
-                  <Layers size={14} color="#F59E0B" style={{ marginRight: 8 }} />
-                  <Text style={styles.statusLabel}>Buffered Queue Cache</Text>
-                </View>
-                <Text style={styles.statusStateWarning}>{queueCount} items delayed</Text>
-              </View>
-
-            </View>
-          </View>
 
           {/* RECENT ACTIVITY TIMELINE */}
           <View style={styles.glassCard}>
