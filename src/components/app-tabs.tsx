@@ -52,6 +52,14 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="timeline">
+        <NativeTabs.Trigger.Label>Timeline</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={require('@/assets/images/tabIcons/explore.png')}
+          renderingMode="template"
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="analytics">
         <NativeTabs.Trigger.Label>Analytics</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
