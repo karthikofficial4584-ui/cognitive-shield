@@ -58,6 +58,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { timelineService } from '@/services/api';
 import { useShield } from '@/context/ShieldContext';
+import { useAuth } from '@/context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -166,10 +167,12 @@ export default function TimelineRoute() {
     }
   };
 
+  const { isAuthenticated } = useAuth();
   const { data, isLoading, isError, error, refetch } = useQuery<any[]>({
     queryKey,
     queryFn,
     refetchInterval: 5000, // Polling auto refresh every 5 seconds
+    enabled: isAuthenticated,
   });
 
   const onRefresh = useCallback(async () => {

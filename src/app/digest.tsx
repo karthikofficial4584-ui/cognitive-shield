@@ -44,6 +44,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { digestService } from '@/services/api';
 import { useShield } from '@/context/ShieldContext';
+import { useAuth } from '@/context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -147,6 +148,8 @@ function DigestScreen() {
   const glowStyle = useAnimatedStyle(() => ({ opacity: glowVal.value }));
 
   // ─── Queries ────────────────────────────────────────────────────────────
+  const { isAuthenticated } = useAuth();
+  
   const {
     data: latestDigest,
     isLoading: isLoadingLatest,
@@ -157,6 +160,7 @@ function DigestScreen() {
     queryKey: ['digest', 'latest'],
     queryFn: digestService.getLatest,
     retry: 2,
+    enabled: isAuthenticated,
   });
 
   const {
@@ -167,6 +171,7 @@ function DigestScreen() {
     queryKey: ['digest', 'history'],
     queryFn: () => digestService.getHistory(10),
     retry: 2,
+    enabled: isAuthenticated,
   });
 
   // ─── Generate Mutation ──────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useAuth } from './AuthContext';
 import { 
   setOfflineMode as setApiOfflineMode,
   userService,
@@ -288,6 +289,7 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
 
   // Sync state from backend if Online Mode is active
   const fetchLatestState = async () => {
+    // Rely on isAuthenticated check
     if (IS_BACKEND_MODE && !isOffline) {
       try {
         setIsLoading(true);
@@ -320,9 +322,13 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const { isAuthenticated } = useAuth();
+
   useEffect(() => {
-    fetchLatestState();
-  }, [isOffline]);
+    if (isAuthenticated) {
+      fetchLatestState();
+    }
+  }, [isOffline, isAuthenticated]);
 
   // Toggle offline simulator
   const toggleOfflineMode = () => {

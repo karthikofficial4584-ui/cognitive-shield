@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { router } from 'expo-router';
 
 // Get API base URL and mode from Expo Environment Variables
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -15,6 +16,12 @@ export const apiClient = axios.create({
   },
 });
 
+let authToken: string | null = null;
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
+};
+export const getAuthToken = () => authToken;
+
 // Request/Response Interceptor for simulation and offline modes
 let isOffline = false;
 
@@ -29,9 +36,27 @@ apiClient.interceptors.request.use(
     if (isOffline) {
       throw new Error('Network Offline. Shield running in Local Cache Mode.');
     }
+    if (authToken) {
+      config.headers.Authorization = `Bearer ${authToken}`;
+    }
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      setAuthToken(null);
+      // Gracefully redirect to login on 401 without crashing
+      router.replace('/login' as any);
+    }
+    if (error.response && error.response.data && error.response.data.detail) {
+      console.error('API Error:', error.response.data.detail);
+    }
+    return Promise.reject(error);
+  }
 );
 
 // Basic retry wrapper for API calls
@@ -48,35 +73,48 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 
 // Helper to determine if we should hit backend or return mock
 const shouldHitBackend = () => IS_BACKEND_MODE && !isOffline;
 
+// Helper to prevent requests without token
+const hasToken = () => !!getAuthToken();
+
 // 2. Endpoint Services Mapping
 export const authService = {
-  login: async (email: string) => {
+  login: async (username: string, password?: string) => {
     if (shouldHitBackend()) {
-      const response = await apiClient.post('/auth/login', { email });
+      const params = new URLSearchParams();
+      params.append('username', username);
+      if (password) params.append('password', password);
+      
+      const response = await apiClient.post('/auth/login', params, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+      if (response.data && response.data.access_token) {
+        setAuthToken(response.data.access_token);
+      }
       return response.data;
     }
     return withRetry(async () => {
-      // Mock POST /auth/login
-      return { token: 'mock-jwt-shield-token-100', user: { email, name: 'Commander Karthik', role: 'Lead Architect' } };
+      const token = 'mock-jwt-shield-token-100';
+      setAuthToken(token);
+      return { token, user: { email: username, name: 'Commander Karthik', role: 'Lead Architect' } };
     });
   },
   logout: async () => {
-    if (shouldHitBackend()) {
-      const response = await apiClient.post('/auth/logout');
-      return response.data;
-    }
+    setAuthToken(null);
     return { success: true };
   },
 };
 
 export const userService = {
   getProfile: async () => {
+    if (!hasToken()) return null;
     if (shouldHitBackend()) {
-      const response = await apiClient.get('/user/profile');
+      const response = await apiClient.get('/auth/me');
       return response.data;
     }
     return withRetry(async () => {
-      // Mock GET /user/profile
+      // Mock GET /auth/me
       return {
         name: 'Commander Karthik',
         role: 'Lead Systems Architect',
@@ -92,8 +130,9 @@ export const userService = {
 
 export const focusService = {
   getScore: async () => {
+    if (!hasToken()) return { focusScore: 0, state: 'Idle' };
     if (shouldHitBackend()) {
-      const response = await apiClient.get('/focus/score');
+      const response = await apiClient.get('/focus/latest');
       return response.data;
     }
     return { focusScore: 88, state: 'Focused' };
@@ -103,56 +142,57 @@ export const focusService = {
       const response = await apiClient.put('/settings', { focusThreshold, urgencyThreshold });
       return response.data;
     }
-    // Mock PUT /settings
     return { success: true, focusThreshold, urgencyThreshold };
   },
 };
 
 export const telemetryService = {
   streamActivity: async (wpm: number, changes: number, retention: number) => {
+    if (!hasToken()) return { velocity: 0 };
     if (shouldHitBackend()) {
-      const response = await apiClient.post('/telemetry', { wpm, changes, retention });
+      const response = await apiClient.post('/telemetry', {
+        typing_speed: wpm,
+        code_changes: changes,
+        window_consistency: retention,
+        mouse_activity: 0,
+        active_window: "VS Code"
+      });
       return response.data;
     }
-    // Mock POST /telemetry
     return { velocity: 0.3 * wpm + 0.5 * changes + 0.2 * retention };
   },
 };
 
 export const notificationsService = {
   fetchLogs: async () => {
+    if (!hasToken()) return [];
     if (shouldHitBackend()) {
-      const response = await apiClient.get('/notifications');
+      const response = await apiClient.get('/notifications/logs');
       return response.data;
     }
-    // Mock GET /notifications
     return [];
   },
   bypassUrgency: async (id: string) => {
-    if (shouldHitBackend()) {
-      const response = await apiClient.post(`/notifications/${id}/bypass`);
-      return response.data;
-    }
-    // Mock POST /notifications/bypass
+    // No backend endpoint exists for bypassUrgency by ID.
+    // Return mock success to prevent network errors.
     return { success: true, id };
   },
 };
 
 export const queueService = {
   fetchQueue: async () => {
+    if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get('/queue');
       return response.data;
     }
-    // Mock GET /queue
     return [];
   },
   releaseOne: async (id: string) => {
     if (shouldHitBackend()) {
-      const response = await apiClient.post(`/queue/${id}/release`);
+      const response = await apiClient.post(`/queue/release/${id}`);
       return response.data;
     }
-    // Mock POST /queue/release
     return { success: true, id };
   },
   releaseAll: async () => {
@@ -160,7 +200,6 @@ export const queueService = {
       const response = await apiClient.post('/queue/release-all');
       return response.data;
     }
-    // Mock POST /queue/release-all
     return { success: true };
   },
   clearQueue: async () => {
@@ -168,29 +207,34 @@ export const queueService = {
       const response = await apiClient.delete('/queue');
       return response.data;
     }
-    // Mock DELETE /queue
     return { success: true };
   },
 };
 
 export const analyticsService = {
   fetchReport: async (range: string) => {
+    if (!hasToken()) return { range, timestamp: Date.now() };
     if (shouldHitBackend()) {
-      const response = await apiClient.get(`/analytics?range=${range}`);
+      let endpoint = '/analytics';
+      if (range === 'today') endpoint = '/analytics/today';
+      else if (range === 'week') endpoint = '/analytics/week';
+      else if (range === 'month') endpoint = '/analytics/month';
+      else if (range === 'daily') endpoint = '/analytics/daily';
+      
+      const response = await apiClient.get(endpoint);
       return response.data;
     }
-    // Mock GET /analytics
     return { range, timestamp: Date.now() };
   },
 };
 
 export const digestService = {
   generateDigest: async () => {
+    if (!hasToken()) return null;
     if (shouldHitBackend()) {
       const response = await apiClient.post('/digest/generate');
       return response.data;
     }
-    // Mock POST /digest/generate
     return {
       id: `digest-${Date.now()}`,
       user_id: 'mock-user',
@@ -204,6 +248,7 @@ export const digestService = {
     };
   },
   getLatest: async () => {
+    if (!hasToken()) return null;
     if (shouldHitBackend()) {
       const response = await apiClient.get('/digest/latest');
       return response.data;
@@ -211,6 +256,7 @@ export const digestService = {
     return null;
   },
   getHistory: async (limit = 20) => {
+    if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get(`/digest/history?limit=${limit}`);
       return response.data;
@@ -221,6 +267,7 @@ export const digestService = {
 
 export const timelineService = {
   fetchTimeline: async (params?: { event_type?: string; event_date?: string; limit?: number; offset?: number }) => {
+    if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get('/timeline', { params });
       return response.data;
@@ -228,6 +275,7 @@ export const timelineService = {
     return getMockTimeline(params);
   },
   fetchToday: async () => {
+    if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get('/timeline/today');
       return response.data;
@@ -235,6 +283,7 @@ export const timelineService = {
     return getMockTimeline({ limit: 10 });
   },
   fetchWeek: async () => {
+    if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get('/timeline/week');
       return response.data;
@@ -242,6 +291,7 @@ export const timelineService = {
     return getMockTimeline({ limit: 30 });
   },
   fetchDemo: async () => {
+    if (!hasToken()) return [];
     if (shouldHitBackend()) {
       const response = await apiClient.get('/timeline/demo');
       return response.data;
