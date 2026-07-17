@@ -10,6 +10,28 @@ import {
   analyticsService 
 } from '../services/api';
 
+export const mapAnalytics = (data: any): ShieldAnalytics => ({
+  productivityScore: data.productivity_score ?? data.productivityScore ?? 0,
+  focusTrend: data.focus_trend ?? data.focusTrend ?? '0%',
+  deepFocusMinutes: data.deep_focus_minutes ?? data.deepFocusMinutes ?? 0,
+  preventedInteractions: data.prevented_interactions ?? data.preventedInteractions ?? 0,
+  savedMinutes: data.saved_minutes ?? data.savedMinutes ?? 0,
+  focusEfficiency: data.focus_efficiency ?? data.focusEfficiency ?? 0,
+  allowedNotif: data.allowed_notif ?? data.allowedNotif ?? 0,
+  blockedNotif: data.blocked_notif ?? data.blockedNotif ?? 0,
+  criticalAlerts: data.critical_alerts ?? data.criticalAlerts ?? 0,
+  queuedNotif: data.queued_notif ?? data.queuedNotif ?? 0,
+  releasedNotif: data.released_notif ?? data.releasedNotif ?? 0,
+  avgQueueTime: data.avg_queue_time ?? data.avgQueueTime ?? 0,
+  avgVelocity: data.avg_velocity ?? data.avgVelocity ?? 0,
+  typingTrend: data.typing_trend ?? data.typingTrend ?? '0 WPM',
+  codeChangesTrend: data.code_changes_trend ?? data.codeChangesTrend ?? '0 lines',
+  consistencyIndex: data.consistency_index ?? data.consistencyIndex ?? data.window_consistency ?? data.windowConsistency ?? 0,
+  attentionStability: data.attention_stability ?? data.attentionStability ?? 0,
+  switchesPrevented: data.switches_prevented ?? data.switchesPrevented ?? 0,
+  weeklyImprovement: data.weekly_improvement ?? data.weeklyImprovement ?? 0,
+});
+
 // Queued card item definition
 export interface ShieldQueuedItem {
   id: string;
@@ -76,7 +98,10 @@ interface ShieldContextProps {
   setCodeChanges: (val: number) => void;
   windowConsistency: number;
   setWindowConsistency: (val: number) => void;
+  mouseActivity: number;
+  setMouseActivity: (val: number) => void;
   focusHistory: number[];
+  hasReceivedTelemetry: boolean;
 
   // Lists and stats
   queue: ShieldQueuedItem[];
@@ -86,23 +111,23 @@ interface ShieldContextProps {
   analytics: ShieldAnalytics;
   setAnalytics: React.Dispatch<React.SetStateAction<ShieldAnalytics>>;
 
-  // Connection/Demo modes
+  // Connection modes
   isOffline: boolean;
   isLoading: boolean;
   setIsLoading: (val: boolean) => void;
-  demoModeActive: boolean;
-  demoStepText: string;
+  isRealFocusSessionActive: boolean;
+  sessionStartTime: Date | null;
+  windowsDndActive: boolean;
   criticalAlertActive: boolean;
   setCriticalAlertActive: (val: boolean) => void;
 
   // Actions
-  startDemoSimulation: () => void;
-  stopDemoSimulation: () => void;
+  startRealFocusSession: () => void;
+  stopRealFocusSession: () => void;
   releaseTop: () => void;
   releaseAll: () => void;
   clearQueue: () => void;
   deleteQueueItem: (id: string) => void;
-  triggerManualAlert: (app: any, title: string, message: string, urgency: number) => void;
   toggleOfflineMode: () => void;
   fetchLatestState: () => Promise<void>;
   isQueuePaused: boolean;
@@ -137,6 +162,7 @@ interface ShieldContextProps {
   setTelemetryPermission: (val: boolean) => void;
   analyticsSharing: boolean;
   setAnalyticsSharing: (val: boolean) => void;
+  connectionStatus: 'connected' | 'disconnected';
 }
 
 const ShieldContext = createContext<ShieldContextProps | undefined>(undefined);
@@ -153,21 +179,17 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
   const IS_BACKEND_MODE = process.env.EXPO_PUBLIC_API_MODE === 'backend';
 
   // 1. Telemetry State
-  const [focusScore, setFocusScore] = useState(88);
-  const [focusHistory, setFocusHistory] = useState<number[]>([76, 78, 77, 80, 81, 79, 82, 83, 80, 82, 84, 85, 83, 81, 82]);
+  const [focusScore, setFocusScore] = useState(0);
+  const [focusHistory, setFocusHistory] = useState<number[]>([]);
+  const [hasReceivedTelemetry, setHasReceivedTelemetry] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected'>('disconnected');
 
-  useEffect(() => {
-    setFocusHistory(prev => {
-      // Prevent consecutive duplicate entries and cap size at 15
-      if (prev[prev.length - 1] === focusScore) return prev;
-      return [...prev.slice(1), focusScore];
-    });
-  }, [focusScore]);
-  const [velocity, setVelocity] = useState(84);
-  const [activeActivity, setActiveActivity] = useState('Deep Focus Coding');
-  const [typingSpeed, setTypingSpeed] = useState(74);
-  const [codeChanges, setCodeChanges] = useState(88);
-  const [windowConsistency, setWindowConsistency] = useState(90);
+  const [velocity, setVelocity] = useState(0);
+  const [activeActivity, setActiveActivity] = useState('Idle');
+  const [typingSpeed, setTypingSpeed] = useState(0);
+  const [codeChanges, setCodeChanges] = useState(0);
+  const [windowConsistency, setWindowConsistency] = useState(0);
+  const [mouseActivity, setMouseActivity] = useState(0);
 
   // 2. Queue list
   const [queue, setQueue] = useState<ShieldQueuedItem[]>([]);
@@ -178,32 +200,32 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
 
   // 4. Analytics metrics
   const [analytics, setAnalytics] = useState<ShieldAnalytics>({
-    productivityScore: 92,
-    focusTrend: '+8% vs yesterday',
-    deepFocusMinutes: 252,
-    preventedInteractions: 42,
-    savedMinutes: 180,
-    focusEfficiency: 94,
-    allowedNotif: 8,
-    blockedNotif: 34,
-    criticalAlerts: 2,
-    queuedNotif: 12,
-    releasedNotif: 10,
-    avgQueueTime: 14,
-    avgVelocity: 84,
-    typingTrend: '+12% WPM',
-    codeChangesTrend: '+142 lines',
-    consistencyIndex: 91,
-    attentionStability: 96,
-    switchesPrevented: 42,
-    weeklyImprovement: 8.5,
+    productivityScore: 0,
+    focusTrend: '0%',
+    deepFocusMinutes: 0,
+    preventedInteractions: 0,
+    savedMinutes: 0,
+    focusEfficiency: 0,
+    allowedNotif: 0,
+    blockedNotif: 0,
+    criticalAlerts: 0,
+    queuedNotif: 0,
+    releasedNotif: 0,
+    avgQueueTime: 0,
+    avgVelocity: 0,
+    typingTrend: '0 WPM',
+    codeChangesTrend: '0 lines',
+    consistencyIndex: 0,
+    attentionStability: 0,
+    switchesPrevented: 0,
+    weeklyImprovement: 0,
   });
 
-  // 5. System States
   const [isOffline, setIsOffline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [demoModeActive, setDemoModeActive] = useState(false);
-  const [demoStepText, setDemoStepText] = useState('Simulation Offline');
+  const [isRealFocusSessionActive, setIsRealFocusSessionActive] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [windowsDndActive, setWindowsDndActive] = useState(false);
   const [criticalAlertActive, setCriticalAlertActive] = useState(false);
 
   // 6. Global Settings (Shared Config)
@@ -221,8 +243,6 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
   const [dataCollection, setDataCollection] = useState(true);
   const [telemetryPermission, setTelemetryPermission] = useState(true);
   const [analyticsSharing, setAnalyticsSharing] = useState(false);
-
-  const demoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const initialSettingsLoadedRef = useRef(false);
 
@@ -251,6 +271,30 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
         if (notifData && Array.isArray(notifData)) {
           setNotifications(notifData);
         }
+        // Fetch focus score history
+        const historyData = await focusService.getHistory(30);
+        if (historyData && Array.isArray(historyData)) {
+          setFocusHistory(historyData.reverse());
+        }
+        // Fetch daily analytics report
+        const analyticsData = await analyticsService.fetchReport('daily');
+        if (analyticsData) {
+          setAnalytics(mapAnalytics(analyticsData));
+        }
+        // Fetch latest telemetry record
+        const telemetryHistory = await telemetryService.getHistory(1);
+        if (telemetryHistory && telemetryHistory.length > 0) {
+          const latest = telemetryHistory[0];
+          setTypingSpeed(latest.typing_speed ?? 0);
+          setCodeChanges(latest.code_changes ?? 0);
+          setWindowConsistency(latest.window_consistency ?? 0);
+          setMouseActivity(latest.mouse_activity ?? 0);
+          setActiveActivity(latest.active_window ?? 'Idle');
+          setVelocity(latest.velocity ?? 0);
+          setHasReceivedTelemetry(true);
+        } else {
+          setHasReceivedTelemetry(false);
+        }
         // Fetch profile/settings
         const userSettings = await focusService.getSettings();
         if (userSettings) {
@@ -272,76 +316,11 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
       }
     } else {
-      // Mock defaults for offline mode
-      setQueue([
-        {
-          id: 'mock-1',
-          sender: 'Slack',
-          app: 'Slack',
-          title: 'Dave: taco lunch?',
-          message: 'Dave: Hey Commander! Grab lunch at 12:15? Tacos down the street are really good.',
-          timeReceived: '22:30',
-          focusScore: 85,
-          urgencyScore: 0.12,
-          estReleaseTime: '6 mins',
-          queuePosition: 1,
-          reason: 'Blocked because Focus Score was 85 and urgency was 0.12.',
-          status: 'Queued',
-        },
-        {
-          id: 'mock-2',
-          sender: 'Microsoft Teams',
-          app: 'Teams',
-          title: 'Product Sync Update',
-          message: 'Sarah: Please post your progress updates in channel before the sync meeting.',
-          timeReceived: '22:15',
-          focusScore: 90,
-          urgencyScore: 0.25,
-          estReleaseTime: '12 mins',
-          queuePosition: 2,
-          reason: 'Blocked because Focus Score was 90 and urgency was 0.25.',
-          status: 'Queued',
-        },
-        {
-          id: 'mock-3',
-          sender: 'GitHub',
-          app: 'GitHub',
-          title: 'PR #42 Approved',
-          message: 'Reviewer: Approved changes in features/auth. Ready for merge.',
-          timeReceived: '21:55',
-          focusScore: 78,
-          urgencyScore: 0.45,
-          estReleaseTime: '3 mins',
-          queuePosition: 3,
-          reason: 'Blocked because Focus Score was 78 and urgency was 0.45.',
-          status: 'Queued',
-        },
-      ]);
-      setNotifications([
-        {
-          id: 'mock-n-1',
-          sender: 'Jira',
-          title: 'Ticket Assigned: SEC-904',
-          message: 'Jirabot: SEC-904 CSS styling bug was assigned to you with high priority.',
-          time: '21:00',
-          status: 'Allowed',
-          urgencyScore: 0.88,
-          focusScore: 82,
-          decisionText: 'Allowed: Urgency 0.88 exceeds Focus Score 82. Priority bypass.',
-        },
-        {
-          id: 'mock-n-2',
-          sender: 'Slack',
-          title: 'Dave: taco lunch?',
-          message: 'Dave: Hey Commander! Grab lunch at 12:15?',
-          time: '22:30',
-          status: 'Blocked',
-          urgencyScore: 0.12,
-          focusScore: 85,
-          decisionText: 'Blocked: Focus Score 85 exceeds Urgency 0.12. Queued to buffer.',
-        },
-      ]);
-      setFocusHistory([76, 78, 77, 80, 81, 79, 82, 83, 80, 82, 84, 85, 83, 81, 82]);
+      // Backend not available: show empty state
+      setQueue([]);
+      setNotifications([]);
+      setFocusHistory([]);
+      setHasReceivedTelemetry(false);
     }
   };
 
@@ -352,6 +331,285 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
       fetchLatestState();
     }
   }, [isOffline, isAuthenticated]);
+
+  // Maintain a ref to the session active state to avoid closure bugs in websocket callbacks
+  const isRealFocusSessionActiveRef = useRef(isRealFocusSessionActive);
+  useEffect(() => {
+    isRealFocusSessionActiveRef.current = isRealFocusSessionActive;
+  }, [isRealFocusSessionActive]);
+
+  // 5. WebSocket and Fallback Polling connection logic
+  useEffect(() => {
+    if (!isAuthenticated || isOffline || !IS_BACKEND_MODE) {
+      setConnectionStatus('disconnected');
+      return;
+    }
+
+    const sockets: { [key: string]: WebSocket | null } = {
+      focus: null,
+      telemetry: null,
+      queue: null,
+      notifications: null,
+      analytics: null,
+    };
+
+    const heartbeats: { [key: string]: ReturnType<typeof setTimeout> | null } = {
+      focus: null,
+      telemetry: null,
+      queue: null,
+      notifications: null,
+      analytics: null,
+    };
+
+    let pollingTimer: ReturnType<typeof setInterval> | null = null;
+    let isDestroyed = false;
+
+    const getWsUrl = (channel: string) => {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      let wsUrl = apiUrl.replace(/^http/, 'ws');
+      if (wsUrl.includes('/api/v1')) {
+        wsUrl = wsUrl.replace(/\/api\/v1\/?$/, '/ws');
+      } else if (wsUrl.includes('/api')) {
+        wsUrl = wsUrl.replace(/\/api\/?$/, '/ws');
+      } else {
+        wsUrl = wsUrl.endsWith('/') ? `${wsUrl}ws` : `${wsUrl}/ws`;
+      }
+      return `${wsUrl}/${channel}`;
+    };
+
+    const updateGlobalConnectionStatus = () => {
+      const allConnected = Object.values(sockets).every(
+        s => s !== null && s.readyState === WebSocket.OPEN
+      );
+      setConnectionStatus(allConnected ? 'connected' : 'disconnected');
+    };
+
+    const resetHeartbeat = (channel: string, ws: WebSocket) => {
+      if (heartbeats[channel]) clearTimeout(heartbeats[channel]!);
+      heartbeats[channel] = setTimeout(() => {
+        console.warn(`[ShieldContext] No heartbeat received on channel ${channel} for 35s. Closing socket.`);
+        ws.close();
+      }, 35000);
+    };
+
+    const connectSocket = (channel: string) => {
+      if (isDestroyed) return;
+
+      try {
+        const url = getWsUrl(channel);
+        console.log(`[ShieldContext] Connecting to WebSocket for channel ${channel}: ${url}`);
+        const ws = new WebSocket(url);
+        sockets[channel] = ws;
+
+        ws.onopen = () => {
+          console.log(`[ShieldContext] WebSocket connected on channel ${channel}`);
+          updateGlobalConnectionStatus();
+          resetHeartbeat(channel, ws);
+        };
+
+        ws.onmessage = (event) => {
+          resetHeartbeat(channel, ws);
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'ping') {
+              try {
+                ws.send(JSON.stringify({ type: 'pong' }));
+              } catch (e) {
+                console.error(`[ShieldContext] Failed to send pong on channel ${channel}:`, e);
+              }
+              return;
+            }
+
+            console.log(`[ShieldContext] WS received on channel ${channel}:`, data);
+
+            const eventName = data.event;
+            const payload = data.payload;
+
+            if (eventName === 'focus_update') {
+              if (payload && typeof payload.focus_score === 'number') {
+                const newScore = payload.focus_score;
+                setFocusScore(newScore);
+                setFocusHistory(prev => {
+                  const updated = [...prev, newScore];
+                  return updated.slice(-30);
+                });
+              }
+            } else if (eventName === 'telemetry_update') {
+              if (payload) {
+                setTypingSpeed(payload.typing_speed ?? 0);
+                setCodeChanges(payload.code_changes ?? 0);
+                setWindowConsistency(payload.window_consistency ?? 0);
+                setMouseActivity(payload.mouse_activity ?? 0);
+                setActiveActivity(payload.active_window ?? 'Idle');
+                const vel = payload.velocity ?? 0;
+                setVelocity(vel);
+                setHasReceivedTelemetry(true);
+              }
+            } else if (eventName === 'notification_update') {
+              if (payload) {
+                if (Array.isArray(payload)) {
+                  const mappedNotifs = payload.map((item: any) => ({
+                    id: item.id,
+                    sender: item.sender,
+                    title: item.title,
+                    message: item.message,
+                    time: item.created_at ? new Date(item.created_at).toTimeString().slice(0, 5) : new Date().toTimeString().slice(0, 5),
+                    status: item.status ?? 'Allowed',
+                    urgencyScore: item.urgency_score ?? 0,
+                    focusScore: item.focus_score_at_arrival ?? 0,
+                    decisionText: item.decision_text ?? '',
+                  }));
+                  setNotifications(mappedNotifs);
+                } else {
+                  const mappedNotif: ShieldNotificationItem = {
+                    id: payload.id,
+                    sender: payload.sender,
+                    title: payload.title,
+                    message: payload.message,
+                    time: payload.created_at ? new Date(payload.created_at).toTimeString().slice(0, 5) : new Date().toTimeString().slice(0, 5),
+                    status: payload.status ?? 'Allowed',
+                    urgencyScore: payload.urgency_score ?? 0,
+                    focusScore: payload.focus_score_at_arrival ?? 0,
+                    decisionText: payload.decision_text ?? '',
+                  };
+                  setNotifications(prev => {
+                    if (prev.some(item => item.id === mappedNotif.id)) return prev;
+                    return [mappedNotif, ...prev];
+                  });
+                }
+              }
+            } else if (eventName === 'queue_update') {
+              if (payload && Array.isArray(payload)) {
+                const mappedQueue = payload.map((item: any) => ({
+                  id: item.id,
+                  sender: item.sender,
+                  app: item.app_name ?? item.app ?? 'System',
+                  title: item.title,
+                  message: item.message,
+                  timeReceived: item.created_at ? new Date(item.created_at).toTimeString().slice(0, 5) : '00:00',
+                  focusScore: item.focus_score_at_arrival ?? item.focusScore ?? 0,
+                  urgencyScore: item.urgency_score ?? item.urgencyScore ?? 0,
+                  estReleaseTime: item.est_release_time ?? item.estReleaseTime ?? '5 mins',
+                  queuePosition: item.queue_position ?? item.queuePosition ?? 1,
+                  reason: item.reason ?? `Blocked because Focus Score was ${item.focus_score_at_arrival ?? 0} and Urgency was ${item.urgency_score ?? 0}.`,
+                  status: item.status ?? 'Queued',
+                }));
+                setQueue(mappedQueue);
+              }
+            } else if (eventName === 'analytics_update') {
+              if (payload) {
+                setAnalytics(mapAnalytics(payload));
+              }
+            }
+          } catch (e) {
+            console.error(`[ShieldContext] Error parsing WebSocket message on channel ${channel}:`, e);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error(`[ShieldContext] WebSocket error on channel ${channel}:`, error);
+        };
+
+        ws.onclose = () => {
+          if (heartbeats[channel]) clearTimeout(heartbeats[channel]!);
+          updateGlobalConnectionStatus();
+          if (!isDestroyed) {
+            console.log(`[ShieldContext] WebSocket closed on channel ${channel}. Reconnecting in 3 seconds...`);
+            sockets[channel] = null;
+            setTimeout(() => {
+              connectSocket(channel);
+            }, 3000);
+          }
+        };
+      } catch (err) {
+        console.error(`[ShieldContext] Failed to connect WebSocket for channel ${channel}:`, err);
+        updateGlobalConnectionStatus();
+        if (!isDestroyed) {
+          setTimeout(() => {
+            connectSocket(channel);
+          }, 3000);
+        }
+      }
+    };
+
+    // Connect to all channels
+    connectSocket('focus');
+    connectSocket('telemetry');
+    connectSocket('queue');
+    connectSocket('notifications');
+    connectSocket('analytics');
+
+    // Polling loop fallback (runs every 5 seconds)
+    const pollData = async () => {
+      // Only poll if any socket is disconnected/not ready
+      const anyDisconnected = Object.values(sockets).some(s => s === null || s.readyState !== WebSocket.OPEN);
+      
+      if (anyDisconnected) {
+        console.log('[ShieldContext] Fallback polling active...');
+        try {
+          const scoreData = await focusService.getScore();
+          if (scoreData) {
+            const newScore = typeof scoreData.focusScore === 'number' ? scoreData.focusScore : 0;
+            setFocusScore(newScore);
+            setFocusHistory(prev => {
+              const updated = [...prev, newScore];
+              return updated.slice(-30);
+            });
+          }
+          
+          const queueData = await queueService.fetchQueue();
+          if (queueData && Array.isArray(queueData)) {
+            setQueue(queueData.map(item => ({
+              ...item,
+              focusScore: item.focusScore ?? 0,
+              urgencyScore: item.urgencyScore ?? 0,
+            })));
+          }
+
+          const notifData = await notificationsService.fetchLogs();
+          if (notifData && Array.isArray(notifData)) {
+            setNotifications(notifData);
+          }
+
+          const telemetryData = await telemetryService.getHistory(1);
+          if (telemetryData && telemetryData.length > 0) {
+            const latest = telemetryData[0];
+            setTypingSpeed(latest.typing_speed ?? 0);
+            setCodeChanges(latest.code_changes ?? 0);
+            setWindowConsistency(latest.window_consistency ?? 0);
+            setMouseActivity(latest.mouse_activity ?? 0);
+            setActiveActivity(latest.active_window ?? 'Idle');
+            setVelocity(latest.velocity ?? 0);
+            setHasReceivedTelemetry(true);
+          }
+
+          const analyticsData = await analyticsService.fetchReport('daily');
+          if (analyticsData) {
+            setAnalytics(mapAnalytics(analyticsData));
+          }
+        } catch (e) {
+          console.error('[ShieldContext] Fallback polling failed:', e);
+        }
+      }
+    };
+
+    pollingTimer = setInterval(pollData, 5000);
+
+    return () => {
+      isDestroyed = true;
+      if (pollingTimer) clearInterval(pollingTimer);
+      Object.keys(heartbeats).forEach(key => {
+        if (heartbeats[key]) clearTimeout(heartbeats[key]!);
+      });
+      Object.keys(sockets).forEach(key => {
+        const ws = sockets[key];
+        if (ws) {
+          ws.onclose = null;
+          ws.close();
+        }
+      });
+    };
+  }, [isAuthenticated, isOffline]);
 
   // Synchronize settings changes to backend
   useEffect(() => {
@@ -384,7 +642,7 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
     isOffline,
   ]);
 
-  // Toggle offline simulator
+  // Toggle offline status
   const toggleOfflineMode = () => {
     const nextState = !isOffline;
     setIsOffline(nextState);
@@ -412,104 +670,7 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Helper trigger notifications
-  const triggerManualAlert = (
-    app: 'Slack' | 'Teams' | 'Email' | 'Jira' | 'GitHub' | 'PagerDuty',
-    title: string,
-    message: string,
-    urgency: number
-  ) => {
-    const newId = `manual-${Date.now()}`;
-    const formattedTime = new Date().toTimeString().slice(0, 5);
 
-    // Sync via API if backend mode active
-    if (IS_BACKEND_MODE && !isOffline) {
-      if (urgency >= urgencyThreshold) {
-        notificationsService.bypassUrgency(newId).catch(console.error);
-      }
-    }
-
-    if (urgency >= urgencyThreshold) {
-      // Critical bypasses
-      const alertItem: ShieldNotificationItem = {
-        id: newId,
-        sender: app,
-        title,
-        message,
-        time: formattedTime,
-        status: 'Critical',
-        urgencyScore: urgency,
-        focusScore,
-        decisionText: `CRITICAL BYPASS: Urgency ${urgency} triggers direct alarm override.`,
-      };
-      setNotifications(prev => [alertItem, ...prev]);
-      setCriticalAlertActive(true);
-      setTimeout(() => setCriticalAlertActive(false), 5000);
-      
-      setAnalytics(prev => ({
-        ...prev,
-        criticalAlerts: prev.criticalAlerts + 1,
-        allowedNotif: prev.allowedNotif + 1,
-      }));
-    } else if (focusScore > urgency * 100) {
-      // Block and queue
-      const blockItem: ShieldQueuedItem = {
-        id: newId,
-        sender: app,
-        app,
-        title,
-        message,
-        timeReceived: formattedTime,
-        focusScore,
-        urgencyScore: urgency,
-        estReleaseTime: '6 mins',
-        queuePosition: queue.length + 1,
-        reason: `Blocked because Focus Score was ${focusScore} and urgency was ${urgency}.`,
-        status: 'Queued',
-      };
-      setQueue(prev => [...prev, blockItem]);
-
-      const logItem: ShieldNotificationItem = {
-        id: newId,
-        sender: app,
-        title,
-        message,
-        time: formattedTime,
-        status: 'Blocked',
-        urgencyScore: urgency,
-        focusScore,
-        decisionText: `Blocked: Focus Score ${focusScore} exceeds Urgency ${urgency}. Queued.`,
-      };
-      setNotifications(prev => [logItem, ...prev]);
-
-      setAnalytics(prev => ({
-        ...prev,
-        blockedNotif: prev.blockedNotif + 1,
-        queuedNotif: prev.queuedNotif + 1,
-        switchesPrevented: prev.switchesPrevented + 1,
-        preventedInteractions: prev.preventedInteractions + 1,
-      }));
-    } else {
-      // Allow alert
-      const allowItem: ShieldNotificationItem = {
-        id: newId,
-        sender: app,
-        title,
-        message,
-        time: formattedTime,
-        status: 'Allowed',
-        urgencyScore: urgency,
-        focusScore,
-        decisionText: `Allowed: Urgency ${urgency} overrides Focus Score ${focusScore}. Delivered.`,
-      };
-      setNotifications(prev => [allowItem, ...prev]);
-
-      setAnalytics(prev => ({
-        ...prev,
-        allowedNotif: prev.allowedNotif + 1,
-      }));
-    }
-  };
 
   // Queue actions
   const releaseTop = async () => {
@@ -689,112 +850,31 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
     }
   }, [focusScore, focusThreshold, queueAutoRelease, queue]);
 
-  // Demo Simulation Logic Steps:
-  const startDemoSimulation = () => {
-    if (demoTimerRef.current) clearInterval(demoTimerRef.current);
-    setDemoModeActive(true);
-    setIsLoading(true);
-
-    let step = 0;
-    setDemoStepText('Initializing sandbox telemetry...');
-
-    // Trigger fake loading skeletons
-    setTimeout(() => {
-      setIsLoading(false);
-      setFocusScore(20);
-      setVelocity(10);
-      setTypingSpeed(5);
-      setCodeChanges(0);
-      setWindowConsistency(30);
-      setActiveActivity('Developer Idle');
-      setDemoStepText('Developer Idle (Focus = 20)');
-    }, 1200);
-
-    demoTimerRef.current = setInterval(() => {
-      step++;
-      
-      if (step === 1) {
-        setActiveActivity('Coding workspace init');
-        setTypingSpeed(45);
-        setCodeChanges(25);
-        setWindowConsistency(65);
-        setVelocity(54);
-        setFocusScore(35);
-        setDemoStepText('Developer starts coding: Telemetry starts rising');
-      } else if (step === 2) {
-        setTypingSpeed(78);
-        setCodeChanges(62);
-        setWindowConsistency(88);
-        setVelocity(76);
-        setFocusScore(54);
-        setActiveActivity('Deep Focus sprint');
-        setDemoStepText('Coding sprint: Focus score climbs to 54');
-      } else if (step === 3) {
-        setFocusScore(72);
-        setDemoStepText('Tunnel-vision retention: Focus score reaches 72');
-      } else if (step === 4) {
-        setFocusScore(88);
-        setTypingSpeed(86);
-        setCodeChanges(94);
-        setWindowConsistency(95);
-        setVelocity(89);
-        setActiveActivity('Deep Flow State');
-        setDemoStepText('Peak Deep Focus unlocked (Focus score = 88)');
-      } else if (step === 5) {
-        setDemoStepText('Incoming Alert: Slack ping blocked by gate threshold');
-        triggerManualAlert('Slack', 'Dave: Lunch today?', 'Commander! Grab tacos at 12:15?', 0.12);
-      } else if (step === 6) {
-        setDemoStepText('Incoming Alert: MS Teams status update buffered');
-        triggerManualAlert('Teams', 'Sarah: Status update', 'Sarah requests sync status update logs.', 0.25);
-      } else if (step === 7) {
-        setDemoStepText('EMERGENCY CRITICAL BYPASS: RED SYSTEM OVERRIDE');
-        triggerManualAlert('PagerDuty', 'ALERT: Production down', 'Red Alert: Main SQL client database connection timeout.', 0.99);
-      } else if (step === 8) {
-        setActiveActivity('Investigating Emergency Alert');
-        setTypingSpeed(0);
-        setCodeChanges(0);
-        setWindowConsistency(100);
-        setVelocity(30);
-        setDemoStepText('Developer stops coding: focus score begins to decay');
-      } else if (step === 9) {
-        setFocusScore(80);
-        setDemoStepText('Decaying focus curve: score drops to 80');
-      } else if (step === 10) {
-        setFocusScore(72);
-        setDemoStepText('Focus drops below 75 threshold. Queue auto-unlocks!');
-      } else if (step === 11) {
-        setDemoStepText('Auto-releasing buffered Slack alert to client');
-        releaseTop();
-      } else if (step === 12) {
-        setDemoStepText('Auto-releasing buffered Teams alert to client');
-        releaseTop();
-      } else if (step >= 13) {
-        clearInterval(demoTimerRef.current!);
-        setDemoModeActive(false);
-        setDemoStepText('Simulation Finished. System stats normalized.');
-        
-        setAnalytics(prev => ({
-          ...prev,
-          deepFocusMinutes: prev.deepFocusMinutes + 25,
-          savedMinutes: prev.savedMinutes + 12,
-          productivityScore: 94,
-        }));
-      }
-    }, 2800);
+  // Real Focus Session Controls
+  const startRealFocusSession = () => {
+    setIsRealFocusSessionActive(true);
+    setSessionStartTime(new Date());
+    setWindowsDndActive(true);
+    setFocusHistory([]); // Clear history on start
+    setHasReceivedTelemetry(false); // Reset to waiting state
   };
 
-  const stopDemoSimulation = () => {
-    if (demoTimerRef.current) clearInterval(demoTimerRef.current);
-    setDemoModeActive(false);
-    setCriticalAlertActive(false);
-    setDemoStepText('Simulation Terminated Manual.');
+  const stopRealFocusSession = () => {
+    setIsRealFocusSessionActive(false);
+    setSessionStartTime(null);
+    setWindowsDndActive(false);
+    setFocusHistory([]); // Clear history on stop
+    releaseAll(); // Flush queue at end of session
   };
 
+  // Auto-activate Windows DND when focus score is high in normal operation
   useEffect(() => {
-    return () => {
-      if (demoTimerRef.current) clearInterval(demoTimerRef.current);
-    };
-  }, []);
+    if (focusScore >= focusThreshold) {
+      setWindowsDndActive(true);
+    } else {
+      setWindowsDndActive(false);
+    }
+  }, [focusScore, focusThreshold]);
 
   return (
     <ShieldContext.Provider
@@ -811,6 +891,8 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
         setCodeChanges,
         windowConsistency,
         setWindowConsistency,
+        mouseActivity,
+        setMouseActivity,
         focusHistory,
         queue,
         setQueue,
@@ -821,17 +903,17 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
         isOffline,
         isLoading,
         setIsLoading,
-        demoModeActive,
-        demoStepText,
+        isRealFocusSessionActive,
+        sessionStartTime,
+        windowsDndActive,
         criticalAlertActive,
         setCriticalAlertActive,
-        startDemoSimulation,
-        stopDemoSimulation,
+        startRealFocusSession,
+        stopRealFocusSession,
         releaseTop,
         releaseAll,
         clearQueue,
         deleteQueueItem,
-        triggerManualAlert,
         toggleOfflineMode,
         fetchLatestState,
         isQueuePaused,
@@ -866,6 +948,8 @@ export function ShieldProvider({ children }: { children: React.ReactNode }) {
         setTelemetryPermission,
         analyticsSharing,
         setAnalyticsSharing,
+        hasReceivedTelemetry,
+        connectionStatus,
       }}>
       {children}
     </ShieldContext.Provider>

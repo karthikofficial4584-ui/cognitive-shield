@@ -104,6 +104,8 @@ function NavigationGate() {
   const segments = useSegments();
   const queryClient = useQueryClient();
 
+  console.log('[NavigationGate] RENDER - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated, 'segments:', segments);
+
   // Clear react query cache when a user logs out
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {

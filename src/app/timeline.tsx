@@ -44,7 +44,6 @@ import {
   CheckCircle2,
   Trash2,
   FileText,
-  Award,
   Sparkles,
   Search,
   Filter,
@@ -75,8 +74,6 @@ const EVENT_CONFIGS: Record<string, { icon: any; color: string; bg: string }> = 
   'Queue Released': { icon: CheckCircle2, color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
   'Queue Cleared': { icon: Trash2, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)' },
   'Digest Generated': { icon: FileText, color: '#EC4899', bg: 'rgba(236, 72, 153, 0.15)' },
-  'Demo Started': { icon: Sparkles, color: '#A855F7', bg: 'rgba(168, 85, 247, 0.2)' },
-  'Demo Finished': { icon: Award, color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.2)' },
   'Break Suggested': { icon: Coffee, color: '#60A5FA', bg: 'rgba(96, 165, 250, 0.15)' },
   'Default': { icon: HelpCircle, color: '#94A3B8', bg: 'rgba(148, 163, 184, 0.1)' },
 };
@@ -120,7 +117,7 @@ export default function TimelineRoute() {
   const { focusScore, queue } = useShield();
 
   // Filters & State
-  const [filterType, setFilterType] = useState<'all' | 'today' | 'week' | 'demo'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'today' | 'week'>('all');
   const [selectedEventType, setSelectedEventType] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [limit, setLimit] = useState(25);
@@ -157,8 +154,6 @@ export default function TimelineRoute() {
         return timelineService.fetchToday();
       case 'week':
         return timelineService.fetchWeek();
-      case 'demo':
-        return timelineService.fetchDemo();
       case 'all':
       default:
         return timelineService.fetchTimeline({
@@ -237,8 +232,6 @@ export default function TimelineRoute() {
     'Queue Released',
     'Queue Cleared',
     'Digest Generated',
-    'Demo Started',
-    'Demo Finished',
     'Break Suggested'
   ];
 
@@ -286,7 +279,7 @@ export default function TimelineRoute() {
 
           {/* Time range selectors */}
           <View style={styles.filterRow}>
-            {(['all', 'today', 'week', 'demo'] as const).map(tab => (
+            {(['all', 'today', 'week'] as const).map(tab => (
               <TouchableOpacity
                 key={tab}
                 style={[styles.filterTab, filterType === tab && styles.filterTabActive]}

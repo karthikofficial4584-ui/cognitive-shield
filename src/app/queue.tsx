@@ -31,15 +31,12 @@ import {
   Shield,
   Activity,
   Bell,
-  Play,
   Pause,
-  RotateCcw,
   Zap,
   Clock,
   Layers,
   Sparkles,
   AlertTriangle,
-  ArrowRight,
   User,
   Sliders,
   Check,
@@ -96,9 +93,6 @@ function QueueManagerScreen() {
     focusScore,
     queue,
     analytics,
-    demoModeActive: isSimulating,
-    startDemoSimulation,
-    stopDemoSimulation,
     releaseTop,
     releaseAll,
     clearQueue,
@@ -212,22 +206,7 @@ function QueueManagerScreen() {
     }
   };
 
-  const startSimulationSequence = () => {
-    if (isSimulating) {
-      stopDemoSimulation();
-      showToast('Simulation stopped');
-    } else {
-      setShowSuccessAnim(false);
-      startDemoSimulation();
-      showToast('Simulation started - Focus level dropping');
-    }
-  };
 
-  const handleResetQueue = () => {
-    stopDemoSimulation();
-    setShowSuccessAnim(false);
-    showToast('Queue reset complete');
-  };
 
   // Reusable badge color picker
   const getQueueStatusGlow = (status: string) => {
@@ -343,69 +322,7 @@ function QueueManagerScreen() {
 
           </View>
 
-          {/* SIMULATION AUTO RELEASE PANEL */}
-          <View style={styles.glassCard}>
-            <View style={styles.engineHeader}>
-              <View style={styles.row}>
-                <Sparkles size={16} color="#A855F7" style={{ marginRight: 8 }} />
-                <Text style={styles.cardTitle}>Auto-Release Simulation Engine</Text>
-              </View>
-              {isSimulating && (
-                <View style={styles.simBadge}>
-                  <Text style={styles.simBadgeText}>AUTO PIPELINE RUNNING</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.engineDesc}>
-              Demonstrates automatic unlocking when Focus Score decays due to user task switching or context breaks.
-            </Text>
 
-            <View style={styles.simFlowchart}>
-              <View style={[styles.flowNode, focusScore === 88 ? styles.flowNodeActiveBlue : null]}>
-                <Text style={styles.flowNodeScore}>88</Text>
-                <Text style={styles.flowNodeLabel}>Focused</Text>
-              </View>
-              <ArrowRight size={12} color="rgba(255,255,255,0.2)" />
-              <View style={[styles.flowNode, focusScore === 82 ? styles.flowNodeActiveBlue : null]}>
-                <Text style={styles.flowNodeScore}>82</Text>
-                <Text style={styles.flowNodeLabel}>Context Shift</Text>
-              </View>
-              <ArrowRight size={12} color="rgba(255,255,255,0.2)" />
-              <View style={[styles.flowNode, focusScore <= 74 ? styles.flowNodeActiveGreen : null]}>
-                <Text style={styles.flowNodeScore}>74</Text>
-                <Text style={styles.flowNodeLabel}>Release Point</Text>
-              </View>
-            </View>
-
-            {/* Sim Control Buttons */}
-            <View style={styles.simButtonsRow}>
-              
-              <TouchableOpacity
-                onPress={startSimulationSequence}
-                style={[styles.btnSim, isSimulating ? styles.btnSimActive : styles.btnSimInactive]}>
-                {isSimulating ? (
-                  <>
-                    <Pause size={14} color="#FFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.btnSimText}>Stop Auto Sim</Text>
-                  </>
-                ) : (
-                  <>
-                    <Play size={14} color="#FFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.btnSimText}>Start Auto Sim</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleResetQueue}
-                style={[styles.btnSim, styles.btnOutline]}>
-                <RotateCcw size={14} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.btnSimText}>Reset Queue</Text>
-              </TouchableOpacity>
-
-            </View>
-
-          </View>
 
           {/* QUEUE CONTROL BUTTONS */}
           <View style={styles.glassCard}>

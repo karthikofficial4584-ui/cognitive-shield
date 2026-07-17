@@ -245,7 +245,7 @@ function DigestScreen() {
           </Animated.View>
 
           {/* ─── Loading State ────────────────────────────────────── */}
-          {isLoading && !hasDigest && (
+          {(isLoading || generateMutation.isPending) && !hasDigest && (
             <Animated.View entering={FadeIn.duration(400)} style={styles.stateContainer}>
               <View style={[styles.loadingCard, { gap: 16, alignItems: 'stretch' }]}>
                 <View style={{ alignItems: 'center', marginBottom: 10 }}>
@@ -264,7 +264,7 @@ function DigestScreen() {
           )}
 
           {/* ─── Error State ─────────────────────────────────────── */}
-          {isErrorLatest && !hasDigest && !isLoading && (
+          {isErrorLatest && !hasDigest && !isLoading && !generateMutation.isPending && (
             <Animated.View entering={FadeIn.duration(400)} style={styles.stateContainer}>
               <View style={styles.errorCard}>
                 <View style={styles.errorIconCircle}>
@@ -283,7 +283,7 @@ function DigestScreen() {
           )}
 
           {/* ─── Empty State ─────────────────────────────────────── */}
-          {!hasDigest && !isLoading && !isErrorLatest && (
+          {!hasDigest && !isLoading && !generateMutation.isPending && !isErrorLatest && (
             <Animated.View entering={FadeInUp.duration(600)} style={styles.stateContainer}>
               <View style={styles.emptyCard}>
                 <AnimatedView style={glowStyle}>
@@ -294,7 +294,7 @@ function DigestScreen() {
                     <Inbox size={40} color="#A855F7" />
                   </LinearGradient>
                 </AnimatedView>
-                <Text style={styles.emptyTitle}>No Digests Yet</Text>
+                <Text style={styles.emptyTitle}>No AI Digest generated yet.</Text>
                 <Text style={styles.emptySubtext}>
                   When notifications are queued during Deep Focus, generate a smart summary to review them all at once.
                 </Text>

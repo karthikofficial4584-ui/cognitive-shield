@@ -321,7 +321,30 @@ function ProfileSettingsScreen() {
                 <Text style={styles.statLabel}>PRODUCTIVITY</Text>
                 <Text style={styles.statVal}>{productivityScore}%</Text>
               </View>
+            </View>
+          </View>
 
+          {/* TODAY'S ACHIEVEMENT */}
+          <Text style={styles.sectionHeading}>Today's Achievement</Text>
+          <View style={[styles.glassCard, { borderColor: '#10B981', borderWidth: 1.5, backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
+            <View style={styles.row}>
+              <Award size={22} color="#10B981" style={{ marginRight: 12 }} />
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFF' }}>
+                  {analytics.deepFocusMinutes >= 90 ? 'Deep Work Hero' : 'Focus Apprentice'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#10B981', marginTop: 2, fontWeight: '600' }}>
+                  {analytics.deepFocusMinutes} Minutes Focus
+                </Text>
+              </View>
+            </View>
+            <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(16, 185, 129, 0.2)' }}>
+              <View style={styles.row}>
+                <CheckCircle2 size={16} color="#10B981" style={{ marginRight: 8 }} />
+                <Text style={{ fontSize: 13, color: '#E2E8F0', fontWeight: '500' }}>
+                  {analytics.allowedNotif === 0 ? 'Zero Distractions Allowed' : `${analytics.preventedInteractions} Interruptions Blocked`}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -570,7 +593,7 @@ function ProfileSettingsScreen() {
 
             <View style={styles.settingToggleRow}>
               <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={styles.toggleLabel}>Simulated Offline Mode</Text>
+                <Text style={styles.toggleLabel}>Offline Cache Mode</Text>
                 <Text style={styles.settingDesc}>Enforces local cached telemetry updates without backend endpoints sync.</Text>
               </View>
               <GlassSwitch value={isOffline} onValueChange={toggleOfflineMode} activeColor={activeColor} />

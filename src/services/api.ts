@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const IS_BACKEND_MODE = process.env.EXPO_PUBLIC_API_MODE === 'backend';
 
-console.log(`[Cognitive Shield API] Mode: ${IS_BACKEND_MODE ? 'Backend' : 'Mock (Sandbox)'} | Base URL: ${API_URL}`);
+console.log(`[Cognitive Shield API] Mode: ${IS_BACKEND_MODE ? 'Backend' : 'Sandbox'} | Base URL: ${API_URL}`);
 
 // 1. Centralized Axios client representing backend connection
 export const apiClient = axios.create({
@@ -73,7 +73,7 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 
   }
 }
 
-// Helper to determine if we should hit backend or return mock
+// Helper to determine if we should hit backend or return local fallback
 const shouldHitBackend = () => IS_BACKEND_MODE && !isOffline;
 
 // Helper to prevent requests without token
@@ -98,7 +98,7 @@ export const authService = {
       return response.data;
     }
     return withRetry(async () => {
-      const token = 'mock-jwt-shield-token-100';
+      const token = 'local-jwt-shield-token-100';
       setAuthToken(token);
       return { token, user: { email: username, name: 'Commander Karthik', role: 'Lead Architect' } };
     });
@@ -124,7 +124,7 @@ export const userService = {
       return data;
     }
     return withRetry(async () => {
-      // Mock GET /auth/me
+      // Local fallback GET /auth/me
       return {
         name: 'Commander Karthik',
         role: 'Lead Systems Architect',
@@ -153,6 +153,17 @@ export const focusService = {
       return data;
     }
     return { focusScore: 88, state: 'Focused' };
+  },
+  getHistory: async (limit = 15) => {
+    if (!hasToken()) return [];
+    if (shouldHitBackend()) {
+      const response = await apiClient.get(`/focus/history?limit=${limit}`);
+      if (Array.isArray(response.data)) {
+        return response.data.map((item: any) => item.focus_score ?? item.focusScore ?? 0);
+      }
+      return [];
+    }
+    return [75, 80, 82, 85, 78, 80, 83, 85];
   },
   getSettings: async () => {
     if (!hasToken()) return null;
@@ -204,6 +215,14 @@ export const telemetryService = {
     }
     return { velocity: 0.3 * wpm + 0.5 * changes + 0.2 * retention };
   },
+  getHistory: async (limit = 10) => {
+    if (!hasToken()) return [];
+    if (shouldHitBackend()) {
+      const response = await apiClient.get(`/telemetry/history?limit=${limit}`);
+      return response.data;
+    }
+    return [];
+  },
 };
 
 export const notificationsService = {
@@ -231,7 +250,7 @@ export const notificationsService = {
   },
   bypassUrgency: async (id: string) => {
     // No backend endpoint exists for bypassUrgency by ID.
-    // Return mock success to prevent network errors.
+    // Return local success to prevent network errors.
     return { success: true, id };
   },
 };
@@ -336,17 +355,7 @@ export const digestService = {
       const response = await apiClient.post('/digest/generate');
       return response.data;
     }
-    return {
-      id: `digest-${Date.now()}`,
-      user_id: 'mock-user',
-      summary: 'You received 5 notifications while in Deep Focus.\n\n• Slack — 2 messages\n• Teams — 1 message\n• Email — 1 message\n• PagerDuty — 1 message\n\nMost important:\nSystem: Production Server Down',
-      notification_count: 5,
-      highest_urgency: 0.95,
-      time_saved_minutes: 10,
-      app_grouping: { Slack: 2, Teams: 1, Email: 1, PagerDuty: 1 },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    return null;
   },
   getLatest: async () => {
     if (!hasToken()) return null;
@@ -384,7 +393,7 @@ export const timelineService = {
       const response = await apiClient.get('/timeline', { params });
       return response.data;
     }
-    return getMockTimeline(params);
+    return [];
   },
   fetchToday: async () => {
     if (!hasToken()) return [];
@@ -392,7 +401,7 @@ export const timelineService = {
       const response = await apiClient.get('/timeline/today');
       return response.data;
     }
-    return getMockTimeline({ limit: 10 });
+    return [];
   },
   fetchWeek: async () => {
     if (!hasToken()) return [];
@@ -400,162 +409,6 @@ export const timelineService = {
       const response = await apiClient.get('/timeline/week');
       return response.data;
     }
-    return getMockTimeline({ limit: 30 });
-  },
-  fetchDemo: async () => {
-    if (!hasToken()) return [];
-    if (shouldHitBackend()) {
-      const response = await apiClient.get('/timeline/demo');
-      return response.data;
-    }
-    return getMockTimeline({ limit: 15 });
+    return [];
   },
 };
-
-function getMockTimeline(params?: any) {
-  const events = [
-    {
-      id: "ev-1",
-      user_id: "mock-user",
-      event_type: "Demo Started",
-      title: "Demo Started",
-      description: "Developer demo simulation started.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      metadata_json: JSON.stringify({ status: "started" }),
-    },
-    {
-      id: "ev-2",
-      user_id: "mock-user",
-      event_type: "Coding Started",
-      title: "Coding Started",
-      description: "Developer started typing (WPM: 40) and editing files.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-      metadata_json: JSON.stringify({ wpm: 40, code_changes: 15 }),
-    },
-    {
-      id: "ev-3",
-      user_id: "mock-user",
-      event_type: "Velocity Changed",
-      title: "Velocity: 42.5%",
-      description: "Development speed is now at 42.5% with WPM: 40.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 13).toISOString(),
-      metadata_json: JSON.stringify({ velocity: 42.5, wpm: 40 }),
-    },
-    {
-      id: "ev-4",
-      user_id: "mock-user",
-      event_type: "Focus Score Changed",
-      title: "Focus Score: 65 (Focused)",
-      description: "Attention protection adjusted to Focused state.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-      metadata_json: JSON.stringify({ focus_score: 65, state: "Focused" }),
-    },
-    {
-      id: "ev-5",
-      user_id: "mock-user",
-      event_type: "Notification Received",
-      title: "Notification from Alice",
-      description: "Received incoming notification 'Lunch?' via Slack.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-      metadata_json: JSON.stringify({ app_name: "Slack", sender: "Alice", title: "Lunch?", urgency_score: 0.4 }),
-    },
-    {
-      id: "ev-6",
-      user_id: "mock-user",
-      event_type: "Notification Allowed",
-      title: "Allowed notification: Lunch?",
-      description: "Notification from Alice was delivered to the user directly.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-      metadata_json: JSON.stringify({ app_name: "Slack", sender: "Alice", title: "Lunch?", urgency_score: 0.4, focus_score: 65 }),
-    },
-    {
-      id: "ev-7",
-      user_id: "mock-user",
-      event_type: "Coding Started",
-      title: "Coding Started",
-      description: "Developer typing speed increased significantly (WPM: 110).",
-      timestamp: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-      metadata_json: JSON.stringify({ wpm: 110, code_changes: 95 }),
-    },
-    {
-      id: "ev-8",
-      user_id: "mock-user",
-      event_type: "Focus Score Changed",
-      title: "Focus Score: 88 (Deep Focus)",
-      description: "Attention protection adjusted to Deep Focus state.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
-      metadata_json: JSON.stringify({ focus_score: 88, state: "Deep Focus" }),
-    },
-    {
-      id: "ev-9",
-      user_id: "mock-user",
-      event_type: "Notification Received",
-      title: "Notification from Manager",
-      description: "Received incoming notification 'Stand-up Reminder' via Slack.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 6).toISOString(),
-      metadata_json: JSON.stringify({ app_name: "Slack", sender: "Manager", title: "Stand-up Reminder", urgency_score: 0.5 }),
-    },
-    {
-      id: "ev-10",
-      user_id: "mock-user",
-      event_type: "Notification Queued",
-      title: "Queued notification: Stand-up Reminder",
-      description: "Notification from Manager was queued due to focus level 88.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 6).toISOString(),
-      metadata_json: JSON.stringify({ app_name: "Slack", sender: "Manager", title: "Stand-up Reminder", urgency_score: 0.5, focus_score: 88 }),
-    },
-    {
-      id: "ev-11",
-      user_id: "mock-user",
-      event_type: "Notification Received",
-      title: "Notification from System",
-      description: "Received incoming notification 'Production Server Down' via PagerDuty.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
-      metadata_json: JSON.stringify({ app_name: "PagerDuty", sender: "System", title: "Production Server Down", urgency_score: 0.95 }),
-    },
-    {
-      id: "ev-12",
-      user_id: "mock-user",
-      event_type: "Notification Allowed",
-      title: "Allowed notification: Production Server Down",
-      description: "Critical notification from System was delivered directly.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
-      metadata_json: JSON.stringify({ app_name: "PagerDuty", sender: "System", title: "Production Server Down", urgency_score: 0.95, focus_score: 88 }),
-    },
-    {
-      id: "ev-13",
-      user_id: "mock-user",
-      event_type: "Queue Released",
-      title: "Queue Released",
-      description: "Released all 1 notification from queue.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
-      metadata_json: JSON.stringify({ count: 1 }),
-    },
-    {
-      id: "ev-14",
-      user_id: "mock-user",
-      event_type: "Digest Generated",
-      title: "AI Digest Generated",
-      description: "Compiled AI summary for 3 notifications. Saved 6 minutes.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
-      metadata_json: JSON.stringify({ notification_count: 3, time_saved_minutes: 6 }),
-    },
-    {
-      id: "ev-15",
-      user_id: "mock-user",
-      event_type: "Demo Finished",
-      title: "Demo Finished",
-      description: "Developer demo simulation finished successfully.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 1).toISOString(),
-      metadata_json: JSON.stringify({ status: "completed" }),
-    }
-  ];
-
-  let filtered = events;
-  if (params?.event_type) {
-    filtered = filtered.filter(e => e.event_type === params.event_type);
-  }
-  const offset = params?.offset || 0;
-  const limit = params?.limit || 100;
-  return filtered.slice(offset, offset + limit);
-}

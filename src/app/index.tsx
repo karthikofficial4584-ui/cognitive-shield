@@ -21,34 +21,20 @@ import Animated, {
   withRepeat,
   withSequence,
   Easing,
-  useDerivedValue,
 } from 'react-native-reanimated';
 import {
   Shield,
   Activity,
-  Bell,
   Play,
   Square,
   BarChart2,
   Clock,
   Calendar,
-  Zap,
   AlertTriangle,
-  Cpu,
   Layers,
-  Sparkles,
   TrendingUp,
-  Keyboard,
-  FileCode,
-  Laptop,
   CheckCircle2,
-  Wifi,
-  Database,
-  Link,
   User,
-  Home,
-  Sliders,
-  LogOut,
   Info,
 } from 'lucide-react-native';
 
@@ -95,15 +81,19 @@ function DashboardScreen() {
       switchesPrevented: 0,
       weeklyImprovement: 0,
     },
-    demoModeActive: isDemoMode = false,
-    startDemoSimulation,
-    stopDemoSimulation,
+    isRealFocusSessionActive = false,
+    sessionStartTime = null,
+    startRealFocusSession,
+    stopRealFocusSession,
+    windowsDndActive = false,
     releaseAll,
     criticalAlertActive = false,
     isLoading = false,
+    fetchLatestState,
+    hasReceivedTelemetry = false,
   } = useShield() || {};
 
-  const [isFocusMode, setIsFocusMode] = useState(false);
+
 
   const clampedFocusScore = typeof focusScore === 'number' && !isNaN(focusScore)
     ? Math.max(0, Math.min(100, focusScore))
@@ -123,17 +113,29 @@ function DashboardScreen() {
   // Toast notification for user actions
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Time ticker
+  // Time ticker and Session Duration
+  const [sessionDuration, setSessionDuration] = useState('00:00:00');
+  
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       setCurrentDate(now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }));
+      
+      if (isRealFocusSessionActive && sessionStartTime) {
+        const diff = Math.floor((now.getTime() - new Date(sessionStartTime).getTime()) / 1000);
+        const hrs = Math.floor(diff / 3600);
+        const mins = Math.floor((diff % 3600) / 60);
+        const secs = diff % 60;
+        setSessionDuration(
+          `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+        );
+      }
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isRealFocusSessionActive, sessionStartTime]);
 
   // Sync timeline with notifications block events
   const timeline = useMemo(() => {
@@ -155,13 +157,15 @@ function DashboardScreen() {
   };
 
   // Quick Action Handlers
-  const handleToggleFocusMode = () => {
-    if (isDemoMode) {
-      stopDemoSimulation();
-      showToast('Demo Simulation Stopped');
-    } else {
-      startDemoSimulation();
-      showToast('Demo Simulation Started');
+  const handleStartRealFocus = () => {
+    startRealFocusSession();
+    showToast('Real Focus Session Started');
+  };
+
+  const handleEndSession = () => {
+    if (isRealFocusSessionActive) {
+      stopRealFocusSession();
+      showToast('Focus Session Ended');
     }
   };
 
@@ -175,8 +179,13 @@ function DashboardScreen() {
   };
 
   const handleRefreshData = () => {
-    showToast('Telemetry refreshed from local backend engine');
+    if (fetchLatestState) {
+      fetchLatestState();
+      showToast('Telemetry refreshed from local backend engine');
+    }
   };
+
+
 
   // 4. Shared Animation Values
   const pulseOpacity = useSharedValue(0.6);
@@ -326,9 +335,58 @@ function DashboardScreen() {
           </LinearGradient>
         )}
 
+
+
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}>
+
+          {/* MODE SELECTION CARD OR ACTIVE SESSION BANNER */}
+          {!isRealFocusSessionActive ? (
+            <View style={[styles.glassCard, { borderColor: '#3B82F6', borderWidth: 1.5 }]}>
+              <View style={styles.row}>
+                <Shield size={24} color="#3B82F6" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFF' }}>REAL FOCUS SESSION</Text>
+                  <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>Monitor your productivity using live telemetry.</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={handleStartRealFocus} style={[styles.actionButton, { backgroundColor: '#3B82F6', borderColor: '#60A5FA', marginTop: 15, width: '100%' }]}>
+                <Play size={16} color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={styles.actionBtnText}>Start Focus Session</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={[styles.glassCard, { borderColor: '#10B981', borderWidth: 1.5, backgroundColor: 'rgba(16, 185, 129, 0.05)' }]}>
+              <View style={styles.row}>
+                <Shield size={22} color="#10B981" style={{ marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFF' }}>Focus Protection Active</Text>
+                  <Text style={{ fontSize: 12, color: '#10B981', marginTop: 2, fontWeight: '600' }}>
+                    {windowsDndActive ? 'Windows Do Not Disturb Enabled' : 'DND Inactive'}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', marginBottom: 2 }}>SESSION TIME</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#10B981', fontVariant: ['tabular-nums'] }}>{sessionDuration}</Text>
+                </View>
+              </View>
+              <View style={[styles.row, { marginTop: 15, justifyContent: 'space-between' }]}>
+                <View style={styles.metricMini}>
+                  <Text style={styles.metricMiniLabel}>Focus Score</Text>
+                  <Text style={styles.metricMiniVal}>{Math.round(clampedFocusScore)}</Text>
+                </View>
+                <View style={styles.metricMini}>
+                  <Text style={styles.metricMiniLabel}>Protected</Text>
+                  <Text style={styles.metricMiniValPink}>{notificationsBlocked}</Text>
+                </View>
+                <View style={styles.metricMini}>
+                  <Text style={styles.metricMiniLabel}>Current App</Text>
+                  <Text style={styles.metricMiniValStr}>{activeActivity || 'VS Code'}</Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* FOCUS SCORE CIRCULAR GAUGE */}
           <View style={styles.glassCard}>
@@ -380,8 +438,14 @@ function DashboardScreen() {
 
               {/* Gauge central text overlay */}
               <View style={styles.gaugeCenterText}>
-                <Text style={styles.gaugeScore}>{Math.round(clampedFocusScore)}</Text>
-                <Text style={[styles.gaugeState, { color: focusColors.text }]}>{focusState.toUpperCase()}</Text>
+                {!hasReceivedTelemetry ? (
+                  <Text style={styles.waitingText}>Waiting for telemetry...</Text>
+                ) : (
+                  <>
+                    <Text style={styles.gaugeScore}>{Math.round(clampedFocusScore)}</Text>
+                    <Text style={[styles.gaugeState, { color: focusColors.text }]}>{focusState.toUpperCase()}</Text>
+                  </>
+                )}
               </View>
             </View>
 
@@ -418,30 +482,7 @@ function DashboardScreen() {
 
 
 
-          {/* AI INSIGHT CARD */}
-          <LinearGradient
-            colors={['rgba(139, 92, 246, 0.15)', 'rgba(59, 130, 246, 0.05)']}
-            style={styles.aiInsightCard}>
-            <View style={styles.row}>
-              <Sparkles size={18} color="#D946EF" style={{ marginRight: 8 }} />
-              <Text style={styles.aiTitle}>Productivity Trend</Text>
-            </View>
-            <View style={styles.aiMetricsRow}>
-              <View style={styles.aiMetricCell}>
-                <Text style={styles.aiMetricLabel}>Today's Productivity</Text>
-                <Text style={styles.aiMetricVal}>Excellent</Text>
-              </View>
-              <View style={styles.aiMetricCell}>
-                <Text style={styles.aiMetricLabel}>Diverted Interruptions</Text>
-                <Text style={styles.aiMetricValPink}>{notificationsBlocked + 12}</Text>
-              </View>
-            </View>
-            <View style={styles.aiDivider} />
-            <Text style={styles.aiRecommendationTitle}>Recommendation</Text>
-            <Text style={styles.aiRecommendationText}>
-              Your deep focus is trending 15% higher than yesterday. Avoid opening communication client suites. We recommend continuing deep focus for another 35 minutes to complete your current task.
-            </Text>
-          </LinearGradient>
+
 
           {/* TODAY'S SUMMARY GRID */}
           <Text style={styles.sectionHeading}>Today's Summary</Text>
@@ -493,27 +534,14 @@ function DashboardScreen() {
           <Text style={styles.sectionHeading}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
             
-            <TouchableOpacity
-              onPress={handleToggleFocusMode}
-              style={[styles.actionButton, isDemoMode ? styles.actionActive : styles.actionInactive]}>
-              {isDemoMode ? (
+            {isRealFocusSessionActive && (
+              <TouchableOpacity
+                onPress={handleEndSession}
+                style={[styles.actionButton, styles.actionActive]}>
                 <Square size={16} color="#FFF" style={{ marginRight: 8 }} />
-              ) : (
-                <Play size={16} color="#FFF" style={{ marginRight: 8 }} />
-              )}
-              <Text style={styles.actionBtnText}>
-                {isDemoMode ? 'Stop Demo' : 'Start Demo'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleToggleFocusMode}
-              style={[styles.actionButton, isFocusMode ? styles.actionActivePurple : styles.actionInactive]}>
-              <Shield size={16} color="#FFF" style={{ marginRight: 8 }} />
-              <Text style={styles.actionBtnText}>
-                {isFocusMode ? 'Focus Active' : 'Focus Mode'}
-              </Text>
-            </TouchableOpacity>
+                <Text style={styles.actionBtnText}>End Focus Session</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               onPress={handleReleaseQueue}
@@ -530,6 +558,8 @@ function DashboardScreen() {
             </TouchableOpacity>
 
           </View>
+
+
 
 
 
@@ -757,6 +787,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
   },
+  waitingText: {
+    fontSize: 10,
+    color: '#94A3B8',
+    textAlign: 'center',
+    fontWeight: '700',
+    paddingHorizontal: 8,
+  },
   gaugeScore: {
     fontSize: 46,
     fontWeight: '900',
@@ -798,6 +835,53 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
     marginTop: 2,
+  },
+  
+
+  metricMini: {
+    alignItems: 'center',
+  },
+  metricMiniLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  metricMiniVal: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  metricMiniValPink: {
+    color: '#D946EF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  metricMiniValStr: {
+    color: '#3B82F6',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  simGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  simButton: {
+    width: '48%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  simBtnText: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '600',
   },
   waveContainer: {
     height: 100,

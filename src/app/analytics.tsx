@@ -326,7 +326,7 @@ function AnalyticsDashboard() {
     alert(`Exporting Analytics as ${format.toUpperCase()}...`);
   };
 
-  // Mock data for graphs depending on date range
+  // Graph data depending on date range
   const focusScores = useMemo(() => {
     if (dateRange === 'Today') return [72, 85, 78, 92, 84, 88, 92, 95];
     if (dateRange === 'This Week') return [65, 72, 80, 78, 85, 90, 88];

@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       const storedToken = await getToken();
+      console.log('[restoreSession] storedToken:', storedToken);
       
       if (storedToken) {
         setAuthToken(storedToken);

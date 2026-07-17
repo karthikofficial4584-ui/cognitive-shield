@@ -23,14 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import {
   Shield,
-  Activity,
-  Bell,
-  Play,
-  Pause,
-  RotateCcw,
   TrendingUp,
-  Zap,
-  Cpu,
   Layers,
   Wifi,
   Database,
@@ -39,18 +32,10 @@ import {
   FileCode,
   Laptop,
   MousePointer,
-  Sliders,
   Sparkles,
-  Clock,
   Lock,
   Unlock,
-  MessageSquare,
-  Check,
-  X,
-  ChevronRight,
   Info,
-  SlidersHorizontal,
-  AlertTriangle,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -63,13 +48,6 @@ export default function ExploreScreen() {
   return <LiveFocusScreen />;
 }
 
-interface NotificationItem {
-  id: string;
-  sender: string;
-  message: string;
-  status: 'Allowed' | 'Blocked';
-  timestamp: string;
-}
 
 import { useShield } from '@/context/ShieldContext';
 
@@ -81,37 +59,16 @@ function LiveFocusScreen() {
     typingSpeed,
     codeChanges,
     windowConsistency,
+    mouseActivity,
     queue,
     notifications,
     analytics,
-    demoModeActive: isSimulating,
-    startDemoSimulation,
-    stopDemoSimulation,
     focusHistory,
+    hasReceivedTelemetry,
   } = useShield();
 
-  // Math parameters
-  const lambda = 0.15;
-  const deltaT = 1.0;
-  const wK = 0.3;
-  const wC = 0.5;
-  const wA = 0.2;
-
   const focusState = focusScore >= 80 ? 'Deep Focus' : focusScore >= 60 ? 'Focused' : focusScore >= 40 ? 'Normal' : focusScore >= 20 ? 'Distracted' : 'Idle';
-  const mouseActivity = Math.max(10, Math.floor(velocityVal * 0.6));
-  const kNorm = parseFloat((typingSpeed / 100).toFixed(2));
-  const cNorm = parseFloat(Math.min(codeChanges / 250, 1.0).toFixed(2));
-  const aNorm = parseFloat((windowConsistency / 100).toFixed(2));
 
-  // Sync timeline with block events
-  const timeline = useMemo(() => {
-    return notifications.slice(0, 4).map((n) => ({
-      id: n.id,
-      time: n.time,
-      event: n.status === 'Blocked' ? `Blocked notification (${n.sender}: "${n.title}")` : `Allowed alert (${n.sender}: "${n.title}")`,
-      type: n.status === 'Blocked' ? 'block' : 'alert',
-    }));
-  }, [notifications]);
 
   // Floating Notification overlay state
   const [currentNotification, setCurrentNotification] = useState<any | null>(null);
@@ -123,7 +80,6 @@ function LiveFocusScreen() {
       blockedCount: analytics.blockedNotif,
       allowedCount: analytics.allowedNotif,
       stabilityRating: analytics.attentionStability,
-      trend: '+12% over 1hr',
     };
   }, [analytics]);
 
@@ -191,37 +147,10 @@ function LiveFocusScreen() {
     }
   };
 
-  const handleToggleSimulation = () => {
-    if (isSimulating) {
-      stopDemoSimulation();
-      showToast('Simulation Paused');
-    } else {
-      startDemoSimulation();
-      showToast('Simulation Started');
-    }
-  };
-
-  const handleResetSimulation = () => {
-    stopDemoSimulation();
-    showToast('Simulation Reset');
-  };
-
-
-  // Demo Command Boosts
-  const handleIncreaseFocus = () => {
-    startDemoSimulation();
-    showToast('Demo Simulation Initiated');
-  };
-
-  const handleDecreaseFocus = () => {
-    stopDemoSimulation();
-    showToast('Simulation Halted');
-  };
-
 
   // 5. Custom SVG Graph Rendering
-  // The graph is width - 40, height is 120. We render 15 points.
-  const graphWidth = width - 80;
+  // The graph is width - 210, height is 120. We render 15 points.
+  const graphWidth = width - 210;
   const graphHeight = 110;
   
   const pathData = useMemo(() => {
@@ -293,12 +222,12 @@ function LiveFocusScreen() {
         {/* HEADER */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Live Focus Core</Text>
-            <Text style={styles.headerSubtitle}>Real-time telemetry and mathematical model</Text>
+            <Text style={styles.headerTitle}>Live Focus</Text>
+            <Text style={styles.headerSubtitle}>Real-time cognitive monitoring</Text>
           </View>
           <View style={styles.headerRight}>
-            <View style={[styles.indicatorLight, { backgroundColor: isSimulating ? '#10B981' : '#EF4444' }]} />
-            <Text style={styles.simText}>{isSimulating ? 'SIM RUNNING' : 'PAUSED'}</Text>
+            <View style={[styles.indicatorLight, { backgroundColor: '#10B981' }]} />
+            <Text style={styles.simText}>LIVE</Text>
           </View>
         </View>
 
@@ -397,8 +326,14 @@ function LiveFocusScreen() {
                 </Svg>
 
                 <View style={styles.gaugeTextOverlay}>
-                  <Text style={styles.gaugeScoreVal}>{focusScore}</Text>
-                  <Text style={[styles.gaugeScoreLabel, { color: focusStateColor }]}>{focusState}</Text>
+                  {!hasReceivedTelemetry ? (
+                    <Text style={styles.waitingText}>Waiting for telemetry...</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.gaugeScoreVal}>{focusScore}</Text>
+                      <Text style={[styles.gaugeScoreLabel, { color: focusStateColor }]}>{focusState}</Text>
+                    </>
+                  )}
                 </View>
               </View>
 
@@ -448,110 +383,7 @@ function LiveFocusScreen() {
 
           </View>
 
-          {/* SIMULATION DEMO CONTROLS */}
-          <View style={styles.glassCard}>
-            <Text style={styles.cardTitle}>Simulation Control Panel</Text>
-            <Text style={styles.controlDesc}>
-              Simulate high cognitive workflows or distraction breaks to test the mathematical score engine.
-            </Text>
 
-            <View style={styles.controlBtnRow}>
-              
-              <TouchableOpacity
-                onPress={handleToggleSimulation}
-                style={[styles.btnControl, isSimulating ? styles.btnActiveRed : styles.btnActiveGreen]}>
-                {isSimulating ? (
-                  <>
-                    <Pause size={14} color="#FFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.btnText}>Pause Sim</Text>
-                  </>
-                ) : (
-                  <>
-                    <Play size={14} color="#FFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.btnText}>Resume Sim</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleResetSimulation}
-                style={[styles.btnControl, styles.btnOutline]}>
-                <RotateCcw size={14} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.btnText}>Reset</Text>
-              </TouchableOpacity>
-
-            </View>
-
-            <View style={styles.controlActionRow}>
-              
-              <TouchableOpacity
-                onPress={handleIncreaseFocus}
-                style={[styles.btnAction, styles.btnBoostGreen]}>
-                <Zap size={14} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.btnText}>Boost Focus</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleDecreaseFocus}
-                style={[styles.btnAction, styles.btnDrainOrange]}>
-                <AlertTriangle size={14} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.btnText}>Drain Focus</Text>
-              </TouchableOpacity>
-
-            </View>
-          </View>
-
-          {/* MATHEMATICAL CALCULATION ENGINE SHELL */}
-          <View style={styles.glassCard}>
-            <View style={styles.row}>
-              <Cpu size={16} color="#8B5CF6" style={{ marginRight: 8 }} />
-              <Text style={styles.cardTitle}>Mathematical Calculation Engine</Text>
-            </View>
-            <Text style={styles.formulaDesc}>
-              Real-time update of the decay filtering algorithm and cognitive velocity score.
-            </Text>
-
-            {/* Formula box */}
-            <View style={styles.shellTerminal}>
-              
-              {/* Formula display */}
-              <View style={styles.shellHeader}>
-                <Text style={styles.shellTitle}>COGNITIVE_SHIELD_SCORE_ENGINE_v1</Text>
-              </View>
-
-              <View style={styles.shellBody}>
-                {/* Equations */}
-                <Text style={styles.shellCodeGreen}># 1. Cognitive Velocity Formula</Text>
-                <Text style={styles.shellCodeWhite}>
-                  V = {wK}*k_norm + {wC}*c_norm + {wA}*a_norm
-                </Text>
-                <Text style={styles.shellCodeDim}>
-                  V = {wK}*({kNorm}) + {wC}*({cNorm}) + {wA}*({aNorm})
-                </Text>
-                <Text style={styles.shellCodeCyan}>
-                  V_result = {velocityVal}%
-                </Text>
-
-                <View style={styles.shellLine} />
-
-                <Text style={styles.shellCodeGreen}># 2. Focus State Decay Formula</Text>
-                <Text style={styles.shellCodeWhite}>
-                  FS = FS_prev × exp(-λ*Δt) + (1 - exp(-λ*Δt)) × V
-                </Text>
-                <Text style={styles.shellCodeDim}>
-                  FS = {focusScore} × e^(-{lambda}*1.0) + (1 - e^-0.15) × {velocityVal}
-                </Text>
-                <Text style={styles.shellCodeDim}>
-                  FS = {focusScore} × 0.86 + 0.14 × {velocityVal}
-                </Text>
-                <Text style={styles.shellCodePurple}>
-                  FS_result = {Math.round(focusScore)}
-                </Text>
-
-              </View>
-
-            </View>
-          </View>
 
           {/* TELEMETRY CARDS */}
           <Text style={styles.sectionHeading}>Live Input Telemetry</Text>
@@ -564,7 +396,6 @@ function LiveFocusScreen() {
                 <Text style={styles.telemetryTitle}>Typing Cadence</Text>
               </View>
               <Text style={styles.telemetryValue}>{typingSpeed} WPM</Text>
-              <Text style={styles.telemetrySub}>Normalized: {kNorm}</Text>
             </View>
 
             {/* Card 2: Code Changes */}
@@ -574,7 +405,6 @@ function LiveFocusScreen() {
                 <Text style={styles.telemetryTitle}>Code Modifications</Text>
               </View>
               <Text style={styles.telemetryValue}>+{codeChanges} Lines</Text>
-              <Text style={styles.telemetrySub}>Normalized: {cNorm}</Text>
             </View>
 
             {/* Card 3: Window Consistency */}
@@ -584,7 +414,6 @@ function LiveFocusScreen() {
                 <Text style={styles.telemetryTitle}>App Retention</Text>
               </View>
               <Text style={styles.telemetryValue}>{windowConsistency}%</Text>
-              <Text style={styles.telemetrySub}>Normalized: {aNorm}</Text>
             </View>
 
             {/* Card 4: Cognitive Velocity */}
@@ -633,26 +462,26 @@ function LiveFocusScreen() {
             <View style={styles.aiAnalysisGrid}>
               
               <View style={styles.aiAnalysisCell}>
-                <Text style={styles.aiCellLabel}>Productivity Score</Text>
-                <Text style={styles.aiCellValGreen}>Optimal</Text>
-              </View>
-
-              <View style={styles.aiAnalysisCell}>
                 <Text style={styles.aiCellLabel}>Attention Stability</Text>
                 <Text style={styles.aiCellValCyan}>{stats.stabilityRating}%</Text>
               </View>
 
               <View style={styles.aiAnalysisCell}>
-                <Text style={styles.aiCellLabel}>Trend Matrix</Text>
-                <Text style={styles.aiCellValPurple}>{stats.trend}</Text>
+                <Text style={styles.aiCellLabel}>Blocked Alerts</Text>
+                <Text style={styles.aiCellValPurple}>{stats.blockedCount}</Text>
               </View>
 
             </View>
 
             <View style={styles.aiLine} />
-            <Text style={styles.aiRecHeading}>System Recommendation</Text>
+            <Text style={styles.aiRecHeading}>System Status</Text>
             <Text style={styles.aiRecText}>
-              Telemetry shows consistent keyboard and workspace coordination. Attention stability index is optimal at {stats.stabilityRating}%. Keep up this cognitive pace for another 20 minutes to close out your deep work sprint window.
+              {stats.stabilityRating >= 80
+                ? `Attention stability is excellent at ${stats.stabilityRating}%. Your cognitive focus is well protected.`
+                : stats.stabilityRating >= 50
+                ? `Attention stability at ${stats.stabilityRating}%. Focus sessions are active and monitoring your workflow.`
+                : `Attention stability at ${stats.stabilityRating}%. Start a focus session to begin protecting your workflow.`
+              }
             </Text>
           </LinearGradient>
 
@@ -718,35 +547,6 @@ function LiveFocusScreen() {
             </View>
           </View>
 
-          {/* ACTIVITY TIMELINE */}
-          <View style={styles.glassCard}>
-            <Text style={styles.cardTitle}>Live Event Streams</Text>
-            <View style={styles.timelineContainer}>
-              {timeline.map((item, index) => (
-                <View key={item.id} style={styles.timelineItem}>
-                  
-                  {/* Left layout */}
-                  <View style={styles.timelineLeft}>
-                    <Text style={styles.timelineTime}>{item.time}</Text>
-                    <View style={styles.timelineLineWrapper}>
-                      <View style={[styles.timelineNode, 
-                        item.type === 'success' ? styles.nodeSuccess :
-                        item.type === 'focus' ? styles.nodeFocus :
-                        item.type === 'block' ? styles.nodeBlock : styles.nodeAlert
-                      ]} />
-                      {index < timeline.length - 1 && <View style={styles.timelineLine} />}
-                    </View>
-                  </View>
-
-                  {/* Right Layout */}
-                  <View style={styles.timelineRight}>
-                    <Text style={styles.timelineText}>{item.event}</Text>
-                  </View>
-
-                </View>
-              ))}
-            </View>
-          </View>
 
         </ScrollView>
 
@@ -954,6 +754,13 @@ const styles = StyleSheet.create({
   gaugeTextOverlay: {
     position: 'absolute',
     alignItems: 'center',
+  },
+  waitingText: {
+    fontSize: 9,
+    color: '#94A3B8',
+    textAlign: 'center',
+    fontWeight: '700',
+    paddingHorizontal: 8,
   },
   gaugeScoreVal: {
     fontSize: 32,
